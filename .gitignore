@@ -1,0 +1,8 @@
+.env
+trade_state.db
+*.db
+venv/
+.venv/
+__pycache__/
+*.pyc
+.vscode/
