@@ -1,8 +1,13 @@
+import sys
 import io
 import requests
 import yfinance as yf
 import pandas as pd
 import pandas_ta as ta
+
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+
 
 def calculate_shoonya_charges(sell_turnover, buy_turnover):
     """
@@ -44,7 +49,20 @@ def run_portfolio_simulation(initial_capital=10000.0, max_concurrent=2, leverage
     symbols = get_nifty50_symbols()
     all_signals = []
     
-    print("\n[1/2] Scanning Nifty 50 constituents and calculating candle indicators...")
+    print("\n[1/3] Fetching NIFTY 50 Benchmark (^NSEI) for Relative Weakness calculation...")
+    try:
+        nifty_raw = yf.download("^NSEI", period="60d", interval="15m", progress=False)
+        if isinstance(nifty_raw.columns, pd.MultiIndex):
+            nifty_raw.columns = nifty_raw.columns.get_level_values(0)
+        nifty_raw['Date'] = nifty_raw.index.date
+        daily_opens = nifty_raw.groupby('Date')['Open'].transform('first')
+        nifty_raw['Nifty_Pct'] = (nifty_raw['Close'] - daily_opens) / daily_opens
+        nifty_pct_map = nifty_raw['Nifty_Pct']
+    except Exception as e:
+        print(f"⚠️ Warning: Could not fetch Nifty index: {e}")
+        nifty_pct_map = pd.Series()
+
+    print("[2/3] Scanning Nifty 50 constituents with RELATIVE WEAKNESS filter...")
     
     for ticker in symbols:
         try:
@@ -66,6 +84,18 @@ def run_portfolio_simulation(initial_capital=10000.0, max_concurrent=2, leverage
             df['VWAP'] = vwap
             df['Stoch_K_prev'] = df['Stoch_K'].shift(1)
 
+            # Calculate Stock % Change from Day Open
+            df['Date'] = df.index.date
+            stock_daily_open = df.groupby('Date')['Open'].transform('first')
+            df['Stock_Pct'] = (df['Close'] - stock_daily_open) / stock_daily_open
+
+            # Map Relative Weakness filter (Stock performing worse than Nifty 50)
+            if not nifty_pct_map.empty:
+                df['Nifty_Pct'] = nifty_pct_map.reindex(df.index).ffill()
+                df['Rel_Weakness'] = df['Stock_Pct'] < df['Nifty_Pct']
+            else:
+                df['Rel_Weakness'] = True
+
             # Time Filter: 10:00 AM to 1:30 PM
             time_filter = (
                 (df.index.hour >= 10) & 
@@ -74,6 +104,7 @@ def run_portfolio_simulation(initial_capital=10000.0, max_concurrent=2, leverage
 
             df['Signal'] = (
                 time_filter &
+                df['Rel_Weakness'] &
                 (df['Stoch_K_prev'] >= 80) & 
                 (df['Stoch_K'] < 80) & 
                 (df['ADX'] > 25) & 
@@ -91,16 +122,33 @@ def run_portfolio_simulation(initial_capital=10000.0, max_concurrent=2, leverage
                     tp = entry_p - (2 * risk)
                     
                     exit_t, pnl_pct, result = None, 0, ''
+                    curr_sl = sl
+                    trailed = False
+
                     for j in range(i+1, len(df)):
                         bar = df.iloc[j]
                         t_bar = df.index[j]
-                        if bar['High'] >= sl:
-                            exit_t, pnl_pct, result = t_bar, -risk_pct, 'SL HIT ❌'
+
+                        # 1. Check if current SL is hit
+                        if bar['High'] >= curr_sl:
+                            if trailed:
+                                exit_t, pnl_pct, result = t_bar, 0.0, 'TRAIL SL (BE) 🛡️'
+                            else:
+                                exit_t, pnl_pct, result = t_bar, -risk_pct, 'SL HIT ❌'
                             break
+
+                        # 2. Check if 1:2 Target is hit
                         elif bar['Low'] <= tp:
                             exit_t, pnl_pct, result = t_bar, (2 * risk_pct), 'TARGET HIT ✅'
                             break
-                        elif (t_bar.hour == 15 and t_bar.minute >= 0) or (t_bar.hour > 15):
+
+                        # 3. Check if +1R profit threshold is reached to trail SL to Breakeven
+                        if not trailed and bar['Low'] <= (entry_p - risk):
+                            curr_sl = entry_p
+                            trailed = True
+
+                        # 4. Check 3:00 PM Square-Off
+                        if (t_bar.hour == 15 and t_bar.minute >= 0) or (t_bar.hour > 15):
                             exit_t, pnl_pct, result = t_bar, (entry_p - bar['Close']) / entry_p, '3PM EXIT ⏱️'
                             break
                     
@@ -112,7 +160,7 @@ def run_portfolio_simulation(initial_capital=10000.0, max_concurrent=2, leverage
         except Exception:
             continue
 
-    print("[2/2] Running chronological portfolio execution simulation...")
+    print("[3/3] Running chronological portfolio execution simulation...")
     signals_df = pd.DataFrame(all_signals).sort_values(by='Entry Time').reset_index(drop=True)
     
     capital = initial_capital

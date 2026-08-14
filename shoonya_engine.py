@@ -66,8 +66,21 @@ class ShoonyaLiveBot(NorenApi):
             pass
         return ["RELIANCE-EQ", "TCS-EQ", "INFY-EQ", "HDFCBANK-EQ", "ICICIBANK-EQ"]
 
-    def evaluate_15m_signal(self, df):
-        """Verify 15-minute breakdown criteria"""
+    def get_nifty_intraday_pct(self):
+        """Fetch current Nifty 50 Index percentage change from day open"""
+        try:
+            quote = self.get_quotes(exchange='NSE', token='26000') # Nifty 50 Index token
+            if quote and quote.get('stat') == 'Ok':
+                ltp = float(quote.get('lp', 0))
+                day_open = float(quote.get('open', 0))
+                if day_open > 0:
+                    return (ltp - day_open) / day_open
+        except Exception:
+            pass
+        return None
+
+    def evaluate_15m_signal(self, df, nifty_pct=None):
+        """Verify 15-minute breakdown criteria with Relative Weakness"""
         if len(df) < 20:
             return False, 0, 0
         
@@ -81,17 +94,24 @@ class ShoonyaLiveBot(NorenApi):
         close_curr = df['Close'].iloc[-1]
         vwap_curr = vwap.iloc[-1]
 
+        # 1. Technical Momentum Breakdown
         signal = (k_prev >= 80) and (k_curr < 80) and (adx_curr > 25) and (close_curr < vwap_curr)
+        if not signal:
+            return False, 0, 0
+
+        # 2. Relative Weakness Filter: Stock must underperform Nifty 50
+        if nifty_pct is not None and 'Open' in df.columns:
+            stock_open = df['Open'].iloc[0]
+            stock_pct = (close_curr - stock_open) / stock_open
+            if stock_pct >= nifty_pct:
+                return False, 0, 0  # Skip: Stock is stronger than Nifty
         
-        if signal:
-            entry_p = close_curr
-            swing_high = df.iloc[-4:-1]['High'].max()
-            sl_p = max(swing_high * 1.0005, entry_p * 1.002)
-            risk = sl_p - entry_p
-            tp_p = entry_p - (2 * risk)
-            return True, sl_p, tp_p
-            
-        return False, 0, 0
+        entry_p = close_curr
+        swing_high = df.iloc[-4:-1]['High'].max()
+        sl_p = max(swing_high * 1.0005, entry_p * 1.002)
+        risk = sl_p - entry_p
+        tp_p = entry_p - (2 * risk)
+        return True, sl_p, tp_p
 
     def enter_short_position(self, symbol, current_price, sl_price, tp_price):
         """Execute Short MIS + Protection SL-LMT Order"""

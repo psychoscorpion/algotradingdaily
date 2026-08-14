@@ -25,8 +25,20 @@ def run_10am_swing_high_scan():
     print("  NIFTY 50 (10:00 AM - 1:30 PM | 3-Bar Swing High SL)  ")
     print("=======================================================\n")
     
-    start_time = time.time()
-    processed_count = 0
+    print("\n[1/2] Fetching NIFTY 50 Benchmark (^NSEI) for Relative Weakness calculation...")
+    try:
+        nifty_raw = yf.download("^NSEI", period="60d", interval="15m", progress=False)
+        if isinstance(nifty_raw.columns, pd.MultiIndex):
+            nifty_raw.columns = nifty_raw.columns.get_level_values(0)
+        nifty_raw['Date'] = nifty_raw.index.date
+        daily_opens = nifty_raw.groupby('Date')['Open'].transform('first')
+        nifty_raw['Nifty_Pct'] = (nifty_raw['Close'] - daily_opens) / daily_opens
+        nifty_pct_map = nifty_raw['Nifty_Pct']
+    except Exception as e:
+        print(f"⚠️ Warning: Could not fetch Nifty index: {e}")
+        nifty_pct_map = pd.Series()
+
+    print("[2/2] Running 60-day 15m scan on Nifty 50 constituents...")
 
     for idx, ticker in enumerate(symbols, 1):
         try:
@@ -50,23 +62,35 @@ def run_10am_swing_high_scan():
             df['VWAP'] = vwap
             df['Stoch_K_prev'] = df['Stoch_K'].shift(1)
 
-            # 2. Refined Time Filter: 10:00 AM to 1:30 PM only
+            # 2. Relative Weakness Filter
+            df['Date'] = df.index.date
+            stock_daily_open = df.groupby('Date')['Open'].transform('first')
+            df['Stock_Pct'] = (df['Close'] - stock_daily_open) / stock_daily_open
+            if not nifty_pct_map.empty:
+                df['Nifty_Pct'] = nifty_pct_map.reindex(df.index).ffill()
+                df['Rel_Weakness'] = df['Stock_Pct'] < df['Nifty_Pct']
+            else:
+                df['Rel_Weakness'] = True
+
+            # 3. Refined Time Filter: 10:00 AM to 1:30 PM only
             time_filter = (
                 (df.index.hour >= 10) & 
                 ((df.index.hour < 13) | ((df.index.hour == 13) & (df.index.minute <= 30)))
             )
 
-            # 3. Strategy Entry Rule
+            # 4. Strategy Entry Rule
             df['Signal'] = (
                 time_filter &
+                df['Rel_Weakness'] &
                 (df['Stoch_K_prev'] >= 80) & 
                 (df['Stoch_K'] < 80) & 
                 (df['ADX'] > 25) & 
                 (df['Close'] < df['VWAP'])
             )
 
-            # 4. Simulation Engine
+            # 5. Simulation Engine
             in_pos, entry_p, sl, tp, entry_t, risk_pct = False, 0, 0, 0, None, 0
+            curr_sl, trailed = 0, False
 
             for i in range(3, len(df)):
                 row = df.iloc[i]
@@ -74,10 +98,12 @@ def run_10am_swing_high_scan():
                 
                 if in_pos:
                     # Stop Loss Hit
-                    if row['High'] >= sl:
+                    if row['High'] >= curr_sl:
+                        res_name = 'TRAIL SL (BE) 🛡️' if trailed else 'SL HIT ❌'
+                        pnl_val = 0.0 if trailed else (-risk_pct * 100)
                         all_trades.append({
                             'Symbol': ticker, 'Entry Time': entry_t, 'Exit Time': t,
-                            'PnL %': -risk_pct * 100, 'Result': 'SL HIT ❌'
+                            'PnL %': pnl_val, 'Result': res_name
                         })
                         in_pos = False
                     # Target Hit
@@ -87,28 +113,31 @@ def run_10am_swing_high_scan():
                             'PnL %': (2 * risk_pct) * 100, 'Result': 'TARGET HIT ✅'
                         })
                         in_pos = False
-                    # 3:00 PM Square-Off
-                    elif (t.hour == 15 and t.minute >= 0) or (t.hour > 15):
-                        pnl_pct = (entry_p - row['Close']) / entry_p
-                        all_trades.append({
-                            'Symbol': ticker, 'Entry Time': entry_t, 'Exit Time': t,
-                            'PnL %': pnl_pct * 100, 'Result': '3PM EXIT ⏱️'
-                        })
-                        in_pos = False
+                    else:
+                        # Trail SL to Breakeven at +1R
+                        if not trailed and row['Low'] <= (entry_p - risk):
+                            curr_sl = entry_p
+                            trailed = True
+
+                        # 3:00 PM Square-Off
+                        if (t.hour == 15 and t.minute >= 0) or (t.hour > 15):
+                            pnl_pct = (entry_p - row['Close']) / entry_p
+                            all_trades.append({
+                                'Symbol': ticker, 'Entry Time': entry_t, 'Exit Time': t,
+                                'PnL %': pnl_pct * 100, 'Result': '3PM EXIT ⏱️'
+                            })
+                            in_pos = False
 
                 if not in_pos and row['Signal']:
                     entry_p = row['Close']
-                    
-                    # Clean 3-bar swing high (guaranteed all from today's session)
                     recent_3_highs = df.iloc[i-3:i]['High']
                     swing_high = recent_3_highs.max()
-                    sl = max(swing_high * 1.0005, entry_p * 1.002)  # 0.05% buffer, min 0.2% SL
-                    
+                    sl = max(swing_high * 1.0005, entry_p * 1.002)
                     risk = sl - entry_p
                     risk_pct = risk / entry_p
-                    
-                    # 1:2 Dynamic Target
                     tp = entry_p - (2 * risk)
+                    curr_sl = sl
+                    trailed = False
                     entry_t = t
                     in_pos = True
             
