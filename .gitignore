@@ -1,8 +1,25 @@
+# Credentials & Secrets
 .env
-trade_state.db
-*.db
+
+# Virtual Environments
 venv/
 .venv/
+
+# Python Cache & Bytecode
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+
+# IDE & Editor Settings
 .vscode/
+.idea/
+
+# Market Data Archives (Disposable Cache)
+market_data/*
+!market_data/.gitkeep
+
+# Database State & Journals
+database/*
+!database/.gitkeep
+trade_state.db
+*.db
