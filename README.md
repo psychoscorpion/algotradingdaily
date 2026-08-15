@@ -48,15 +48,33 @@ An automated intraday trading execution engine and portfolio simulator built in 
 
 ## 📁 Repository Structure
 
-* `strategies/`: Trading strategies layer (one module per strategy).
-  * `strategies/vwap_stoch_breakdown.py`: Strategy rules, entry/exit criteria, and trade lifecycle simulation.
-* `core/`: Shared strategy core (pure indicators, fee calculations, database models).
-  * `core/indicators.py`: Pure mathematical technical indicators (Stoch RSI, ADX, VWAP, Relative Weakness).
-  * `core/charges.py`: Shoonya statutory & regulatory transaction cost calculator.
-* `portfolio_sim.py`: Chronological 60-day portfolio simulator factoring in broker friction & STT.
-* `shoonya_engine.py`: Live execution daemon connecting to Shoonya API with order placement & trailing SL.
-* `backtest.py`: Standalone single-stock technical indicator scan.
-* `trade_db.py`: SQLite state tracking database for position persistence and recovery across restarts.
+```text
+shoonya_algo/
+├── core/                  # Pure math, indicators & regulatory fee calculators
+│   ├── indicators.py      # Stoch RSI, ADX, VWAP, Relative Weakness formulas
+│   └── charges.py         # Shoonya STT, GST, brokerage & friction math
+│
+├── strategies/            # Trading strategies layer (one module per strategy)
+│   └── vwap_stoch_breakdown.py # Rules, entry/exit criteria & single-trade lifecycle
+│
+├── data_pipeline/         # Market data gateway & historical caching
+│   ├── data_feed.py       # Smart local caching & fallback data loader
+│   └── shoonya_loader.py  # Shoonya 1-year historical downloader
+│
+├── backtesting/           # Historical simulation & scanning engines
+│   ├── portfolio_sim.py   # Chronological multi-stock portfolio simulator
+│   └── scanner.py         # Unconstrained single-stock indicator scanner
+│
+├── live_trading/          # Execution engines
+│   ├── base_engine.py     # Common scheduler, candle aggregator & trailing SL
+│   ├── paper_trader.py    # Risk-free virtual paper trading
+│   └── live_trader.py     # Real-money Shoonya OMS order placement
+│
+├── market_data/           # Local candle cache CSVs (git-ignored)
+├── database/              # SQLite trade journals (git-ignored)
+├── .env                   # Broker credentials
+└── README.md
+```
 
 ---
 
