@@ -8,31 +8,7 @@ import pandas_ta as ta
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 
-
-def calculate_shoonya_charges(sell_turnover, buy_turnover):
-    """
-    Computes exact Shoonya statutory & regulatory charges for an Intraday Equity Trade.
-    Shoonya Pricing:
-      - Brokerage: 0.03% or ₹5.00 per executed order (whichever is lower)
-      - STT: 0.025% on Sell side only
-      - Exchange Txn (NSE): 0.00297% on Total Turnover
-      - SEBI Turnover Fee: ₹10 / Crore (0.0001%)
-      - Stamp Duty: 0.003% on Buy side
-      - GST: 18% on (Brokerage + Exchange Txn + SEBI Fees)
-    """
-    entry_brokerage = min(sell_turnover * 0.0003, 5.00)
-    exit_brokerage = min(buy_turnover * 0.0003, 5.00)
-    total_brokerage = entry_brokerage + exit_brokerage
-
-    total_turnover = sell_turnover + buy_turnover
-    stt = sell_turnover * 0.00025
-    exchange_txn = total_turnover * 0.0000297
-    sebi_charges = total_turnover * 0.000001
-    stamp_duty = buy_turnover * 0.00003
-    gst = (total_brokerage + exchange_txn + sebi_charges) * 0.18
-
-    total_charges = total_brokerage + stt + exchange_txn + sebi_charges + stamp_duty + gst
-    return total_charges
+from core.charges import calculate_shoonya_charges
 
 
 def get_nifty50_symbols():
@@ -263,9 +239,14 @@ def print_simulation_report(tdf, initial_capital, ending_capital, total_charges,
     gross_profit = net_profit + total_charges
     gross_return_pct = (gross_profit / initial_capital) * 100
 
+    start_date = pd.to_datetime(tdf['Entry Time']).min().strftime('%Y-%m-%d')
+    end_date = pd.to_datetime(tdf['Exit Time']).max().strftime('%Y-%m-%d')
+    trading_days = len(pd.to_datetime(tdf['Entry Time']).dt.date.unique())
+
     print("\n=======================================================")
     print("      ₹10,000 CAPITAL SIMULATION (MAX 2 CONCURRENT)   ")
     print("=======================================================")
+    print(f"Simulation Period      : {start_date} to {end_date} ({trading_days} Trading Days)")
     print(f"Initial Capital        : ₹{initial_capital:,.2f}")
     print(f"Per-Trade Exposure     : ₹{trade_exposure:,.2f} (₹{per_trade_margin:,.0f} x {leverage} MIS)")
     print(f"Total Trades Taken     : {total_trades}")
@@ -277,7 +258,7 @@ def print_simulation_report(tdf, initial_capital, ending_capital, total_charges,
     print(f"Total Taxes & Fees     : ₹{total_charges:,.2f}")
     print(f"Total Net Profit       : ₹{net_profit:,.2f} (Post-All Charges)")
     print(f"Ending Capital Balance : ₹{ending_capital:,.2f}")
-    print(f"60-Day Net Return      : {net_return_pct:.2f}%")
+    print(f"Net Return             : {net_return_pct:.2f}%")
     print("=======================================================\n")
     print("Outcome Distribution:")
     print(tdf['Result'].value_counts())

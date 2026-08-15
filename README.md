@@ -29,10 +29,11 @@ An automated intraday trading execution engine and portfolio simulator built in 
 
 ---
 
-## 📊 Backtest Performance (60-Day Simulation)
+## 📊 Backtest Performance (Simulation)
 
 | Metric | Simulated Result |
 | :--- | :--- |
+| **Simulation Period** | **2026-05-25 to 2026-08-14 (56 Trading Days)** |
 | **Initial Capital** | ₹10,000.00 |
 | **Per-Trade Exposure** | ₹25,000.00 (₹5,000 margin x 5 MIS) |
 | **Total Trades Taken** | 131 (59 Wins / 72 Losses) |
@@ -40,15 +41,17 @@ An automated intraday trading execution engine and portfolio simulator built in 
 | **Gross Profit (Pre-Tax)** | **₹5,736.69 (+57.37%)** |
 | **Total Statutory Taxes & Brokerage** | **₹2,699.70** |
 | **Total Net Profit** | **+₹3,036.99 (Post-All Charges)** |
-| **60-Day Net Return** | **+30.37%** |
+| **Net Return** | **+30.37%** |
 | **Ending Capital Balance** | **₹13,036.99** |
 
 ---
 
 ## 📁 Repository Structure
 
-* `shoonya_engine.py`: Live execution daemon connecting to Shoonya API with order placement & trailing SL.
+* `core/`: Shared strategy core (technical indicators, fee calculations, database models).
+  * `core/charges.py`: Shoonya statutory & regulatory transaction cost calculator.
 * `portfolio_sim.py`: Chronological 60-day portfolio simulator factoring in broker friction & STT.
+* `shoonya_engine.py`: Live execution daemon connecting to Shoonya API with order placement & trailing SL.
 * `backtest.py`: Standalone single-stock technical indicator scan.
 * `trade_db.py`: SQLite state tracking database for position persistence and recovery across restarts.
 
