@@ -34,6 +34,9 @@ class TradingConfig:
     SQUAREOFF_HOUR: int = int(os.getenv("SQUAREOFF_HOUR", "15"))
     SQUAREOFF_MINUTE: int = int(os.getenv("SQUAREOFF_MINUTE", "0"))
 
+    # Order Execution Mode (BO = Bracket Order with exchange protection, MIS = Standard Margin)
+    ORDER_TYPE: str = os.getenv("ORDER_TYPE", "BO").upper()
+
     # Risk Management Settings
     MIN_SL_BUFFER_PCT: float = float(os.getenv("MIN_SL_BUFFER_PCT", "0.002"))  # 0.2% min SL buffer
     SWING_HIGH_BARS: int = int(os.getenv("SWING_HIGH_BARS", "3"))             # 3-bar swing high

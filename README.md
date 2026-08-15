@@ -124,7 +124,12 @@ python -m backtesting.portfolio_sim
 python -m backtesting.scanner
 ```
 
-### Run Live Execution Engine:
+### Run Virtual Paper Trading Engine:
 ```bash
-python shoonya_engine.py
+python -m live_trading.paper_trader
+```
+
+### Run Live Real-Money Execution Engine:
+```bash
+python -m live_trading.live_trader
 ```
