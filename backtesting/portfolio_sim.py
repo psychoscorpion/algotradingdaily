@@ -11,10 +11,6 @@ Simulates real-world account execution under realistic trading constraints:
 
 import os
 import sys
-import io
-import requests
-# pyrefly: ignore [missing-import]
-import yfinance as yf
 import pandas as pd
 
 # Ensure workspace root is in sys.path for direct script execution

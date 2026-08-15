@@ -85,3 +85,12 @@ class BaseTradingEngine(NorenApi):
         """Returns symbols formatted for Shoonya NSE cash trading (e.g. INFY-EQ)."""
         symbols = get_nifty50_symbols()
         return [f"{s.replace('.NS', '')}-EQ" for s in symbols]
+
+    def sync_active_positions_from_db(self, mode: Optional[str] = None) -> int:
+        """Restores open trade state from SQLite database on engine startup/recovery."""
+        from core.trade_db import get_active_positions
+        saved = get_active_positions(mode=mode)
+        for pos in saved:
+            self.active_positions[pos['symbol']] = pos
+        print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] 🔄 State synchronized: {len(self.active_positions)} active position(s) loaded from DB.")
+        return len(self.active_positions)
