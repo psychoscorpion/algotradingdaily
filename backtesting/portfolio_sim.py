@@ -24,6 +24,7 @@ if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 
 from core.charges import calculate_shoonya_charges
+from core.config import CONFIG, TradingConfig
 from data_pipeline import get_nifty50_symbols, fetch_nifty_benchmark, fetch_stock_candles
 from strategies.vwap_stoch_breakdown import (
     STRATEGY_NAME,
@@ -32,7 +33,7 @@ from strategies.vwap_stoch_breakdown import (
 )
 
 
-def scan_universe_signals(symbols, nifty_pct_map):
+def scan_universe_signals(symbols, nifty_pct_map, config: TradingConfig = CONFIG):
     """
     Scans all stock symbols in the universe and compiles all candidate trade signals.
     Returns a DataFrame of all detected signals sorted chronologically by Entry Time.
@@ -42,17 +43,17 @@ def scan_universe_signals(symbols, nifty_pct_map):
 
     for ticker in symbols:
         try:
-            raw_df = fetch_stock_candles(ticker, period="60d", interval="15m")
+            raw_df = fetch_stock_candles(ticker, period=config.BACKTEST_PERIOD, interval=config.TIMEFRAME)
             if raw_df is None:
                 continue
 
-            df = evaluate_signals(raw_df, nifty_pct_map)
+            df = evaluate_signals(raw_df, nifty_pct_map, config=config)
             if df is None:
                 continue
 
-            for i in range(3, len(df)):
+            for i in range(config.SWING_HIGH_BARS, len(df)):
                 if df.iloc[i]['Signal']:
-                    trade = simulate_single_trade(df, i, ticker)
+                    trade = simulate_single_trade(df, i, ticker, config=config)
                     if trade:
                         all_signals.append(trade)
         except Exception:
@@ -64,15 +65,15 @@ def scan_universe_signals(symbols, nifty_pct_map):
     return pd.DataFrame(all_signals).sort_values(by='Entry Time').reset_index(drop=True)
 
 
-def simulate_portfolio_execution(signals_df, initial_capital=10000.0, max_concurrent=2, leverage=5):
+def simulate_portfolio_execution(signals_df: pd.DataFrame, config: TradingConfig = CONFIG):
     """
     Executes candidate signals chronologically, enforcing max concurrent position slots
     and computing exact Shoonya regulatory and statutory fee deductions per trade.
     """
     print("[3/3] Running chronological portfolio execution simulation...")
-    capital = initial_capital
-    per_trade_margin = capital / max_concurrent       # ₹5,000 margin
-    trade_exposure = per_trade_margin * leverage     # ₹25,000 position
+    capital = config.INITIAL_CAPITAL
+    per_trade_margin = config.per_trade_margin
+    trade_exposure = config.per_trade_exposure
 
     active_trades = []
     executed_trades = []
@@ -83,7 +84,7 @@ def simulate_portfolio_execution(signals_df, initial_capital=10000.0, max_concur
             # Release slots that closed before this entry
             active_trades = [t for t in active_trades if t['Exit Time'] > sig['Entry Time']]
 
-            if len(active_trades) < max_concurrent:
+            if len(active_trades) < config.MAX_CONCURRENT_POSITIONS:
                 sell_turnover = trade_exposure
                 buy_turnover = trade_exposure * (1.0 - sig['PnL %'])
 
@@ -105,12 +106,13 @@ def simulate_portfolio_execution(signals_df, initial_capital=10000.0, max_concur
     return tdf, capital, total_charges_paid, trade_exposure, per_trade_margin
 
 
-def print_simulation_report(tdf, initial_capital, ending_capital, total_charges, trade_exposure, per_trade_margin, leverage):
+def print_simulation_report(tdf: pd.DataFrame, ending_capital: float, total_charges: float, config: TradingConfig = CONFIG):
     """Prints a formatted summary dashboard of the portfolio simulation performance."""
     if tdf.empty:
         print("\n⚠️ No trades were executed during this simulation period.")
         return
 
+    initial_capital = config.INITIAL_CAPITAL
     win_count = len(tdf[tdf['Net PnL (₹)'] > 0])
     loss_count = len(tdf[tdf['Net PnL (₹)'] <= 0])
     total_trades = len(tdf)
@@ -126,11 +128,11 @@ def print_simulation_report(tdf, initial_capital, ending_capital, total_charges,
 
     print("\n=======================================================")
     print(f"      STRATEGY: {STRATEGY_NAME.upper()}")
-    print("      ₹10,000 CAPITAL SIMULATION (MAX 2 CONCURRENT)   ")
+    print(f"      ₹{initial_capital:,.0f} CAPITAL SIMULATION (MAX {config.MAX_CONCURRENT_POSITIONS} CONCURRENT)   ")
     print("=======================================================")
     print(f"Simulation Period      : {start_date} to {end_date} ({trading_days} Trading Days)")
     print(f"Initial Capital        : ₹{initial_capital:,.2f}")
-    print(f"Per-Trade Exposure     : ₹{trade_exposure:,.2f} (₹{per_trade_margin:,.0f} x {leverage} MIS)")
+    print(f"Per-Trade Exposure     : ₹{config.per_trade_exposure:,.2f} (₹{config.per_trade_margin:,.0f} x {config.LEVERAGE_MIS} MIS)")
     print(f"Total Trades Taken     : {total_trades}")
     print(f"Winning Trades         : {win_count}")
     print(f"Losing Trades          : {loss_count}")
@@ -146,27 +148,22 @@ def print_simulation_report(tdf, initial_capital, ending_capital, total_charges,
     print(tdf['Result'].value_counts())
 
 
-def run_portfolio_simulation(initial_capital=10000.0, max_concurrent=2, leverage=5):
+def run_portfolio_simulation(config: TradingConfig = CONFIG):
     """Main orchestrator for the portfolio simulation."""
     symbols = get_nifty50_symbols()
-    nifty_pct_map = fetch_nifty_benchmark()
-    signals_df = scan_universe_signals(symbols, nifty_pct_map)
+    nifty_pct_map = fetch_nifty_benchmark(period=config.BACKTEST_PERIOD, interval=config.TIMEFRAME)
+    signals_df = scan_universe_signals(symbols, nifty_pct_map, config=config)
 
-    tdf, ending_capital, total_charges, trade_exposure, per_trade_margin = simulate_portfolio_execution(
+    tdf, ending_capital, total_charges, _, _ = simulate_portfolio_execution(
         signals_df=signals_df,
-        initial_capital=initial_capital,
-        max_concurrent=max_concurrent,
-        leverage=leverage
+        config=config
     )
 
     print_simulation_report(
         tdf=tdf,
-        initial_capital=initial_capital,
         ending_capital=ending_capital,
         total_charges=total_charges,
-        trade_exposure=trade_exposure,
-        per_trade_margin=per_trade_margin,
-        leverage=leverage
+        config=config
     )
 
 

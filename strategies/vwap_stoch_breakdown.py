@@ -19,13 +19,18 @@ Strategy Rules:
 
 import pandas as pd
 from typing import Optional, Dict, Any
+from core.config import CONFIG, TradingConfig
 from core.indicators import add_stoch_rsi, add_adx, add_vwap, add_relative_weakness
 
 STRATEGY_NAME = "VWAP-Stoch Breakdown"
 STRATEGY_VERSION = "1.0.0"
 
 
-def evaluate_signals(df: pd.DataFrame, nifty_pct_map: Optional[pd.Series] = None) -> Optional[pd.DataFrame]:
+def evaluate_signals(
+    df: pd.DataFrame, 
+    nifty_pct_map: Optional[pd.Series] = None,
+    config: TradingConfig = CONFIG
+) -> Optional[pd.DataFrame]:
     """
     Evaluates the VWAP-Stoch Breakdown strategy criteria on 15m candle DataFrames.
     Returns enriched DataFrame with boolean 'Signal' column, or None if data is insufficient.
@@ -47,10 +52,13 @@ def evaluate_signals(df: pd.DataFrame, nifty_pct_map: Optional[pd.Series] = None
     # 2. Add Relative Weakness Filter
     df = add_relative_weakness(df, nifty_pct_map)
 
-    # 3. Time Filter: 10:00 AM to 1:30 PM IST
+    # 3. Time Filter: Configurable Entry Window (Default: 10:00 AM to 1:30 PM IST)
     time_filter = (
-        (df.index.hour >= 10) & 
-        ((df.index.hour < 13) | ((df.index.hour == 13) & (df.index.minute <= 30)))
+        (df.index.hour >= config.ENTRY_START_HOUR) & 
+        (
+            (df.index.hour < config.ENTRY_END_HOUR) | 
+            ((df.index.hour == config.ENTRY_END_HOUR) & (df.index.minute <= config.ENTRY_END_MINUTE))
+        )
     )
 
     # 4. Generate Strategy Entry Signals
@@ -66,22 +74,27 @@ def evaluate_signals(df: pd.DataFrame, nifty_pct_map: Optional[pd.Series] = None
     return df
 
 
-def simulate_single_trade(df: pd.DataFrame, entry_idx: int, ticker: str) -> Optional[Dict[str, Any]]:
+def simulate_single_trade(
+    df: pd.DataFrame, 
+    entry_idx: int, 
+    ticker: str,
+    config: TradingConfig = CONFIG
+) -> Optional[Dict[str, Any]]:
     """
     Simulates the forward lifecycle of a single VWAP-Stoch Breakdown short position from entry_idx.
     Enforces:
       1. Initial Stop Loss vs +1R Trailed Stop Loss (Breakeven).
       2. Dynamic 1:2 Risk-to-Reward Target.
-      3. 3:00 PM Intraday Auto-Squareoff.
+      3. Intraday Auto-Squareoff (Default: 3:00 PM).
     Returns a trade dictionary or None if no exit was reached.
     """
     entry_t = df.index[entry_idx]
     entry_p = df.iloc[entry_idx]['Close']
-    swing_high = df.iloc[entry_idx - 3 : entry_idx]['High'].max()
-    sl = max(swing_high * 1.0005, entry_p * 1.002)
+    swing_high = df.iloc[entry_idx - config.SWING_HIGH_BARS : entry_idx]['High'].max()
+    sl = max(swing_high * 1.0005, entry_p * (1.0 + config.MIN_SL_BUFFER_PCT))
     risk = sl - entry_p
     risk_pct = risk / entry_p
-    tp = entry_p - (2 * risk)
+    tp = entry_p - (config.RISK_REWARD_RATIO * risk)
 
     exit_t, pnl_pct, result = None, 0.0, ''
     curr_sl = sl
@@ -99,9 +112,9 @@ def simulate_single_trade(df: pd.DataFrame, entry_idx: int, ticker: str) -> Opti
                 exit_t, pnl_pct, result = t_bar, -risk_pct, 'SL HIT ❌'
             break
 
-        # 2. Check if 1:2 Target is hit
+        # 2. Check if Target is hit
         elif bar['Low'] <= tp:
-            exit_t, pnl_pct, result = t_bar, (2 * risk_pct), 'TARGET HIT ✅'
+            exit_t, pnl_pct, result = t_bar, (config.RISK_REWARD_RATIO * risk_pct), 'TARGET HIT ✅'
             break
 
         # 3. Check if +1R profit threshold is reached to trail SL to Breakeven
@@ -109,8 +122,8 @@ def simulate_single_trade(df: pd.DataFrame, entry_idx: int, ticker: str) -> Opti
             curr_sl = entry_p
             trailed = True
 
-        # 4. Check 3:00 PM Square-Off
-        if (t_bar.hour == 15 and t_bar.minute >= 0) or (t_bar.hour > 15):
+        # 4. Check Configurable Square-Off (Default: 3:00 PM)
+        if (t_bar.hour == config.SQUAREOFF_HOUR and t_bar.minute >= config.SQUAREOFF_MINUTE) or (t_bar.hour > config.SQUAREOFF_HOUR):
             exit_t, pnl_pct, result = t_bar, (entry_p - bar['Close']) / entry_p, '3PM EXIT ⏱️'
             break
 

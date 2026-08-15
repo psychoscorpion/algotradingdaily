@@ -20,6 +20,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 
+from core.config import CONFIG, TradingConfig
 from data_pipeline import get_nifty50_symbols, fetch_nifty_benchmark, fetch_stock_candles
 from strategies.vwap_stoch_breakdown import (
     STRATEGY_NAME,
@@ -29,7 +30,7 @@ from strategies.vwap_stoch_breakdown import (
 )
 
 
-def run_strategy_scan():
+def run_strategy_scan(config: TradingConfig = CONFIG):
     symbols = get_nifty50_symbols()
     all_trades = []
     start_time = time.time()
@@ -37,25 +38,25 @@ def run_strategy_scan():
 
     print("\n=======================================================")
     print(f"  SCANNER: {STRATEGY_NAME.upper()} (v{STRATEGY_VERSION})")
-    print("  NIFTY 50 (10:00 AM - 1:30 PM | 3-Bar Swing High SL)  ")
+    print(f"  NIFTY 50 ({config.ENTRY_START_HOUR}:00 AM - {config.ENTRY_END_HOUR}:{config.ENTRY_END_MINUTE} | {config.SWING_HIGH_BARS}-Bar Swing High SL)  ")
     print("=======================================================")
 
-    nifty_pct_map = fetch_nifty_benchmark()
-    print("[2/2] Running 60-day 15m scan on Nifty 50 constituents...")
+    nifty_pct_map = fetch_nifty_benchmark(period=config.BACKTEST_PERIOD, interval=config.TIMEFRAME)
+    print(f"[2/2] Running {config.BACKTEST_PERIOD} {config.TIMEFRAME} scan on Nifty 50 constituents...")
 
     for idx, ticker in enumerate(symbols, 1):
         try:
-            raw_df = fetch_stock_candles(ticker, period="60d", interval="15m")
+            raw_df = fetch_stock_candles(ticker, period=config.BACKTEST_PERIOD, interval=config.TIMEFRAME)
             if raw_df is None:
                 continue
 
-            df = evaluate_signals(raw_df, nifty_pct_map)
+            df = evaluate_signals(raw_df, nifty_pct_map, config=config)
             if df is None:
                 continue
 
-            for i in range(3, len(df)):
+            for i in range(config.SWING_HIGH_BARS, len(df)):
                 if df.iloc[i]['Signal']:
-                    trade = simulate_single_trade(df, i, ticker)
+                    trade = simulate_single_trade(df, i, ticker, config=config)
                     if trade:
                         trade_entry = trade.copy()
                         trade_entry['PnL %'] = trade_entry['PnL %'] * 100
