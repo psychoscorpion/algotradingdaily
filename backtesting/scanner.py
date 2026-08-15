@@ -10,6 +10,7 @@ import sys
 import io
 import time
 import requests
+# pyrefly: ignore [missing-import]
 import yfinance as yf
 import pandas as pd
 
