@@ -20,43 +20,13 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 
+from data_pipeline import get_nifty50_symbols, fetch_nifty_benchmark, fetch_stock_candles
 from strategies.vwap_stoch_breakdown import (
     STRATEGY_NAME,
     STRATEGY_VERSION,
     evaluate_signals,
     simulate_single_trade,
 )
-
-
-def get_nifty50_symbols():
-    url = "https://archives.nseindia.com/content/indices/ind_nifty50list.csv"
-    headers = {"User-Agent": "Mozilla/5.0"}
-    try:
-        res = requests.get(url, headers=headers, timeout=10)
-        if res.status_code == 200:
-            df = pd.read_csv(io.StringIO(res.text))
-            return [f"{sym}.NS" for sym in df['Symbol'].tolist()]
-    except Exception:
-        pass
-    return ["GRASIM.NS", "DIXON.NS", "TATAMOTORS.NS", "INFY.NS", "RELIANCE.NS"]
-
-
-def fetch_nifty_benchmark(period="60d", interval="15m"):
-    """
-    Downloads NIFTY 50 Benchmark (^NSEI) and computes intraday % return from Day Open.
-    """
-    print("\n[1/2] Fetching NIFTY 50 Benchmark (^NSEI) for Relative Weakness calculation...")
-    try:
-        nifty_raw = yf.download("^NSEI", period=period, interval=interval, progress=False)
-        if isinstance(nifty_raw.columns, pd.MultiIndex):
-            nifty_raw.columns = nifty_raw.columns.get_level_values(0)
-        nifty_raw['Date'] = nifty_raw.index.date
-        daily_opens = nifty_raw.groupby('Date')['Open'].transform('first')
-        nifty_raw['Nifty_Pct'] = (nifty_raw['Close'] - daily_opens) / daily_opens
-        return nifty_raw['Nifty_Pct']
-    except Exception as e:
-        print(f"⚠️ Warning: Could not fetch Nifty index: {e}")
-        return pd.Series()
 
 
 def run_strategy_scan():
@@ -68,14 +38,17 @@ def run_strategy_scan():
     print("\n=======================================================")
     print(f"  SCANNER: {STRATEGY_NAME.upper()} (v{STRATEGY_VERSION})")
     print("  NIFTY 50 (10:00 AM - 1:30 PM | 3-Bar Swing High SL)  ")
-    print("=======================================================\n")
+    print("=======================================================")
 
     nifty_pct_map = fetch_nifty_benchmark()
     print("[2/2] Running 60-day 15m scan on Nifty 50 constituents...")
 
     for idx, ticker in enumerate(symbols, 1):
         try:
-            raw_df = yf.download(ticker, period="60d", interval="15m", progress=False)
+            raw_df = fetch_stock_candles(ticker, period="60d", interval="15m")
+            if raw_df is None:
+                continue
+
             df = evaluate_signals(raw_df, nifty_pct_map)
             if df is None:
                 continue
