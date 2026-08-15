@@ -10,6 +10,14 @@ from .indicators import (
     add_relative_weakness,
 )
 from .config import TradingConfig, CONFIG
+from .trade_db import (
+    init_db,
+    save_active_position,
+    update_trailing_sl,
+    close_and_archive_position,
+    get_active_positions,
+    get_trade_journal,
+)
 
 __all__ = [
     "TradingConfig",
@@ -20,4 +28,10 @@ __all__ = [
     "add_adx",
     "add_vwap",
     "add_relative_weakness",
+    "init_db",
+    "save_active_position",
+    "update_trailing_sl",
+    "close_and_archive_position",
+    "get_active_positions",
+    "get_trade_journal",
 ]

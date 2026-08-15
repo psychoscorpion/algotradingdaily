@@ -34,6 +34,9 @@ class TradingConfig:
     SQUAREOFF_HOUR: int = int(os.getenv("SQUAREOFF_HOUR", "15"))
     SQUAREOFF_MINUTE: int = int(os.getenv("SQUAREOFF_MINUTE", "0"))
 
+    # Live Trading & Database Execution Mode (paper = Virtual Sandbox, live = Real Money OMS)
+    TRADING_MODE: str = os.getenv("TRADING_MODE", "paper").lower()
+
     # Order Execution Mode (BO = Bracket Order with exchange protection, MIS = Standard Margin)
     ORDER_TYPE: str = os.getenv("ORDER_TYPE", "BO").upper()
 
