@@ -260,6 +260,8 @@ def print_simulation_report(tdf, initial_capital, ending_capital, total_charges,
     win_rate = (win_count / total_trades) * 100 if total_trades > 0 else 0
     net_profit = ending_capital - initial_capital
     net_return_pct = (net_profit / initial_capital) * 100
+    gross_profit = net_profit + total_charges
+    gross_return_pct = (gross_profit / initial_capital) * 100
 
     print("\n=======================================================")
     print("      ₹10,000 CAPITAL SIMULATION (MAX 2 CONCURRENT)   ")
@@ -270,6 +272,8 @@ def print_simulation_report(tdf, initial_capital, ending_capital, total_charges,
     print(f"Winning Trades         : {win_count}")
     print(f"Losing Trades          : {loss_count}")
     print(f"Win Rate               : {win_rate:.2f}%")
+    print("-------------------------------------------------------")
+    print(f"Gross Profit (Pre-Tax) : ₹{gross_profit:,.2f} (+{gross_return_pct:.2f}%)")
     print(f"Total Taxes & Fees     : ₹{total_charges:,.2f}")
     print(f"Total Net Profit       : ₹{net_profit:,.2f} (Post-All Charges)")
     print(f"Ending Capital Balance : ₹{ending_capital:,.2f}")

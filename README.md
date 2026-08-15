@@ -34,11 +34,14 @@ An automated intraday trading execution engine and portfolio simulator built in 
 | Metric | Simulated Result |
 | :--- | :--- |
 | **Initial Capital** | ₹10,000.00 |
-| **60-Day Net Return** | **+30.37%** (Post-All Charges) |
-| **Ending Capital Balance** | **₹13,036.99** |
+| **Per-Trade Exposure** | ₹25,000.00 (₹5,000 margin x 5 MIS) |
+| **Total Trades Taken** | 131 (59 Wins / 72 Losses) |
 | **Win Rate** | **45.04%** |
-| **Total Trades Taken** | 131 |
-| **Total Statutory Fees Paid** | ₹2,699.70 |
+| **Gross Profit (Pre-Tax)** | **₹5,736.69 (+57.37%)** |
+| **Total Statutory Taxes & Brokerage** | **₹2,699.70** |
+| **Total Net Profit** | **+₹3,036.99 (Post-All Charges)** |
+| **60-Day Net Return** | **+30.37%** |
+| **Ending Capital Balance** | **₹13,036.99** |
 
 ---
 
