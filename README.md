@@ -4,7 +4,7 @@ An automated intraday trading execution engine and portfolio simulator built in 
 
 ---
 
-## 📈 Strategy Overview
+## 📈 Strategy Overview: VWAP-Stoch Breakdown
 
 * **Universe:** NIFTY 50 Constituents (NSE)
 * **Timeframe:** 15-Minute Candles
@@ -48,7 +48,10 @@ An automated intraday trading execution engine and portfolio simulator built in 
 
 ## 📁 Repository Structure
 
-* `core/`: Shared strategy core (technical indicators, fee calculations, database models).
+* `strategies/`: Trading strategies layer (one module per strategy).
+  * `strategies/vwap_stoch_breakdown.py`: Strategy rules, entry/exit criteria, and trade lifecycle simulation.
+* `core/`: Shared strategy core (pure indicators, fee calculations, database models).
+  * `core/indicators.py`: Pure mathematical technical indicators (Stoch RSI, ADX, VWAP, Relative Weakness).
   * `core/charges.py`: Shoonya statutory & regulatory transaction cost calculator.
 * `portfolio_sim.py`: Chronological 60-day portfolio simulator factoring in broker friction & STT.
 * `shoonya_engine.py`: Live execution daemon connecting to Shoonya API with order placement & trailing SL.
