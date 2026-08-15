@@ -100,15 +100,29 @@ python -m venv venv
 pip install yfinance pandas pandas-ta requests python-dotenv pyotp NorenRestApiPy
 ```
 
-### 4. Configure Environment Variables
+### 4. Configure System & Broker Settings
+System defaults are centrally defined in [`core/config.py`](core/config.py). You only need to provide your broker credentials in `.env`. Any strategy or portfolio setting can optionally be overridden in `.env` without editing Python code:
+
 Create a `.env` file in the root directory:
 ```env
+# -------------------------------------------------------------
+# 1. Mandatory Broker Credentials (Finvasia Shoonya)
+# -------------------------------------------------------------
 SHOONYA_USER=your_user_id
 SHOONYA_PWD=your_password
 SHOONYA_API_KEY=your_api_key
 SHOONYA_VENDOR_CODE=your_vendor_code
 SHOONYA_TOTP_KEY=your_totp_secret_key
 SHOONYA_IMEI=shoonya_algo_desktop
+
+# -------------------------------------------------------------
+# 2. Optional Overrides (Defaults are active in core/config.py)
+# -------------------------------------------------------------
+# TRADING_MODE=paper              # Default: paper (paper_trades.db) | live (live_trades.db)
+# ORDER_TYPE=BO                   # Default: BO (Bracket Order) | MIS (Standard Margin)
+# INITIAL_CAPITAL=10000.0         # Default: ₹10,000.00
+# MAX_CONCURRENT_POSITIONS=2      # Default: 2 open trade slots
+# LEVERAGE_MIS=5                  # Default: 5x intraday MIS leverage
 ```
 
 ---
