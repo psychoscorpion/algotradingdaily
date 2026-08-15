@@ -1,9 +1,23 @@
+"""
+Multi-Stock Chronological Portfolio Execution Simulator.
+
+Simulates real-world account execution under realistic trading constraints:
+  - Fixed baseline capital (default: ₹10,000)
+  - Strict max concurrent position slots (default: 2 slots)
+  - Intraday equity MIS leverage (default: 5x)
+  - Exact Shoonya statutory taxes and brokerage deductions per trade
+  - Chronological slot allocation (first valid breakdown fills open slot)
+"""
+
+import os
 import sys
 import io
 import requests
 import yfinance as yf
 import pandas as pd
-import pandas_ta as ta
+
+# Ensure workspace root is in sys.path for direct script execution
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')

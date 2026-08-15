@@ -113,9 +113,14 @@ SHOONYA_IMEI=shoonya_algo_desktop
 
 ## 💻 Usage
 
-### Run 60-Day Portfolio Simulation:
+### Run Portfolio Simulation (₹10,000 Capital, 2 Slots):
 ```bash
-python portfolio_sim.py
+python -m backtesting.portfolio_sim
+```
+
+### Run Unconstrained Strategy Scanner:
+```bash
+python -m backtesting.scanner
 ```
 
 ### Run Live Execution Engine:

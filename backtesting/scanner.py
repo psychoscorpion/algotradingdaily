@@ -5,12 +5,16 @@ Scans the NIFTY 50 universe unconstrained (assuming unlimited capital slots)
 using the VWAP-Stoch Breakdown strategy from the strategies package.
 """
 
+import os
 import sys
 import io
 import time
 import requests
 import yfinance as yf
 import pandas as pd
+
+# Ensure workspace root is in sys.path for direct script execution
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
@@ -79,7 +83,6 @@ def run_strategy_scan():
                 if df.iloc[i]['Signal']:
                     trade = simulate_single_trade(df, i, ticker)
                     if trade:
-                        # Convert fractional PnL to percentage for scanner report
                         trade_entry = trade.copy()
                         trade_entry['PnL %'] = trade_entry['PnL %'] * 100
                         all_trades.append(trade_entry)
