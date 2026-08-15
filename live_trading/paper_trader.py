@@ -9,10 +9,8 @@ Executes real-time strategy signals in virtual paper trading mode:
 
 import os
 import sys
-import time
 import datetime
 from typing import Dict, Any, Optional
-import pandas as pd
 
 # Ensure workspace root is in sys.path for direct script execution
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -22,7 +20,7 @@ if hasattr(sys.stdout, 'reconfigure'):
 
 from core.config import CONFIG, TradingConfig
 from live_trading.base_engine import BaseTradingEngine
-from strategies.vwap_stoch_breakdown import STRATEGY_NAME, evaluate_signals
+from strategies.vwap_stoch_breakdown import STRATEGY_NAME
 
 
 class PaperTradingEngine(BaseTradingEngine):

@@ -10,12 +10,9 @@ Provides shared runtime capabilities:
 
 import os
 import sys
-import time
 import datetime
 # pyrefly: ignore [missing-import]
 import pyotp
-# pyrefly: ignore [missing-import]
-import pandas as pd
 from typing import Dict, Any, List, Optional
 # pyrefly: ignore [missing-import]
 from NorenRestApiPy.NorenApi import NorenApi
@@ -47,10 +44,16 @@ class BaseTradingEngine(NorenApi):
         self.imei = os.getenv("SHOONYA_IMEI", "shoonya_algo_desktop")
 
     def authenticate(self) -> bool:
-        """Performs automated TOTP authentication with Shoonya."""
-        if not self.totp_key or not self.user:
-            print("⚠️ Shoonya credentials missing in .env. Running in offline/virtual mode.")
+        """Performs automated TOTP authentication with Shoonya or falls back to virtual mode."""
+        is_placeholder = (
+            not self.user or not self.totp_key or 
+            "your_" in (self.user or "").lower() or 
+            "your_" in (self.totp_key or "").lower()
+        )
+        if is_placeholder:
+            print("⚠️ Shoonya credentials not configured. Running in Offline Virtual Mode (yfinance feed).")
             return False
+
         try:
             totp = pyotp.TOTP(self.totp_key).now()
             res = self.login(
@@ -63,7 +66,7 @@ class BaseTradingEngine(NorenApi):
             print("❌ Authentication Failed:", res)
             return False
         except Exception as e:
-            print("❌ Login Exception:", e)
+            print(f"⚠️ Shoonya Auth Exception ({e}). Running in Offline Virtual Mode.")
             return False
 
     def is_entry_window_active(self, now: Optional[datetime.datetime] = None) -> bool:
