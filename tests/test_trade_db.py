@@ -158,6 +158,64 @@ class TestTradeDatabase(unittest.TestCase):
                             f"Index '{idx_name}' missing from '{test_mode}' database schema!"
                         )
 
+    def test_stale_positions_detection(self):
+        """Verifies get_stale_positions accurately identifies unclosed trades from prior days."""
+        from core.trade_db import get_stale_positions, get_db_connection
+
+        stale_probe_symbol = f"__STALE_PROBE_{int(datetime.datetime.now().timestamp())}__"
+        today_probe_symbol = f"__TODAY_PROBE_{int(datetime.datetime.now().timestamp())}__"
+
+        for test_mode in ["paper", "live"]:
+            with self.subTest(mode=test_mode):
+                init_db(mode=test_mode)
+
+                # 1. Insert an artificial stale position from 2 days ago
+                past_date_str = (datetime.datetime.now() - datetime.timedelta(days=2)).strftime("%Y-%m-%d 10:15:00")
+                save_active_position(
+                    symbol=stale_probe_symbol,
+                    entry_order_id="STALE_ORD_001",
+                    sl_order_id="STALE_SL_001",
+                    qty=15,
+                    entry_p=2500.0,
+                    sl_p=2520.0,
+                    tp_p=2460.0,
+                    mode=test_mode
+                )
+                # Manually adjust entry_time to past date for stale test
+                with get_db_connection(mode=test_mode) as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("UPDATE active_positions SET entry_time = ? WHERE symbol = ?", (past_date_str, stale_probe_symbol))
+                    conn.commit()
+
+                # 2. Insert a normal active position from today
+                save_active_position(
+                    symbol=today_probe_symbol,
+                    entry_order_id="TODAY_ORD_001",
+                    sl_order_id="TODAY_SL_001",
+                    qty=10,
+                    entry_p=1800.0,
+                    sl_p=1815.0,
+                    tp_p=1770.0,
+                    mode=test_mode
+                )
+
+                # 3. Test get_stale_positions detection
+                stale_found = get_stale_positions(mode=test_mode)
+                stale_symbols = [p['symbol'] for p in stale_found]
+
+                self.assertIn(stale_probe_symbol, stale_symbols, f"Stale probe {stale_probe_symbol} was not detected!")
+                self.assertNotIn(today_probe_symbol, stale_symbols, f"Today's active probe {today_probe_symbol} was incorrectly flagged as stale!")
+
+                detected_probe = next(p for p in stale_found if p['symbol'] == stale_probe_symbol)
+                self.assertIn("d", detected_probe['age_str'], f"Expected age_str with days, got {detected_probe['age_str']}")
+                self.assertGreater(detected_probe['elapsed_seconds'], 86400)
+
+                # 4. Clean up probe rows (zero pollution)
+                with get_db_connection(mode=test_mode) as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("DELETE FROM active_positions WHERE symbol IN (?, ?)", (stale_probe_symbol, today_probe_symbol))
+                    conn.commit()
+
 
 if __name__ == "__main__":
     unittest.main()

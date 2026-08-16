@@ -21,6 +21,7 @@ from .trade_db import (
     close_and_archive_position,
     get_active_positions,
     get_trade_journal,
+    get_stale_positions,
 )
 
 __all__ = [
@@ -39,4 +40,5 @@ __all__ = [
     "close_and_archive_position",
     "get_active_positions",
     "get_trade_journal",
+    "get_stale_positions",
 ]

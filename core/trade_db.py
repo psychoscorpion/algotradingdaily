@@ -234,6 +234,49 @@ def get_trade_journal(mode: str = "paper", limit: int = 100) -> List[Dict[str, A
         return [dict(row) for row in cursor.fetchall()]
 
 
+def get_stale_positions(mode: Optional[str] = None) -> List[Dict[str, Any]]:
+    """
+    Inspects active_positions in either 'paper' or 'live' DB (defaults to CONFIG.TRADING_MODE)
+    and returns unclosed trades from previous calendar days without modifying any data.
+    Calculates elapsed age for diagnostics.
+    """
+    selected_mode = (mode or CONFIG.TRADING_MODE).lower()
+    active_list = get_active_positions(mode=selected_mode)
+    now = datetime.datetime.now()
+    today_start = datetime.datetime(now.year, now.month, now.day, 0, 0, 0)
+    
+    stale_list = []
+    for pos in active_list:
+        entry_time_str = pos.get('entry_time', '')
+        try:
+            entry_dt = datetime.datetime.strptime(entry_time_str, "%Y-%m-%d %H:%M:%S")
+        except Exception:
+            try:
+                entry_dt = datetime.datetime.fromisoformat(entry_time_str)
+            except Exception:
+                entry_dt = None
+
+        if entry_dt and entry_dt < today_start:
+            elapsed = now - entry_dt
+            days = elapsed.days
+            hours, remainder = divmod(elapsed.seconds, 3600)
+            mins, _ = divmod(remainder, 60)
+            
+            if days > 0:
+                age_str = f"{days}d {hours}h"
+            elif hours > 0:
+                age_str = f"{hours}h {mins}m"
+            else:
+                age_str = f"{mins}m"
+                
+            pos_copy = dict(pos)
+            pos_copy['age_str'] = age_str
+            pos_copy['elapsed_seconds'] = int(elapsed.total_seconds())
+            stale_list.append(pos_copy)
+            
+    return stale_list
+
+
 if __name__ == "__main__":
     if hasattr(sys.stdout, 'reconfigure'):
         sys.stdout.reconfigure(encoding='utf-8')
@@ -245,17 +288,38 @@ if __name__ == "__main__":
     init_db("paper")
     init_db("live")
 
+    paper_stale = get_stale_positions(mode="paper")
+    live_stale = get_stale_positions(mode="live")
+    total_stale = len(paper_stale) + len(live_stale)
+
+    # 1. Prominent Stale / Orphan Positions Diagnostic Header
+    print("--- [1/2] STALE / ORPHAN POSITION AUDIT ---------------")
+    if total_stale == 0:
+        print("  ✅ Status: CLEAN — 0 orphan/stale positions across all databases.")
+    else:
+        print(f"  ⚠️ Status: ATTENTION — Found {total_stale} stale position(s) from past sessions!")
+        if paper_stale:
+            print("  📂 Paper Trading DB Stale Positions:")
+            for p in paper_stale:
+                print(f"     • {p['symbol']:<12} | Entry: {p['entry_time']} | Qty: {p['quantity']:>3} | Price: ₹{p['entry_price']:>8,.2f} | Age: {p['age_str']}")
+        if live_stale:
+            print("  📂 Live Real-Money DB Stale Positions:")
+            for p in live_stale:
+                print(f"     • {p['symbol']:<12} | Entry: {p['entry_time']} | Qty: {p['quantity']:>3} | Price: ₹{p['entry_price']:>8,.2f} | Age: {p['age_str']}")
+
+    # 2. Database Health & Persistence State
+    print("\n--- [2/2] DATABASE STORAGE & RECORD COUNTS ------------")
     paper_active = len(get_active_positions(mode="paper"))
     paper_history = len(get_trade_journal(mode="paper", limit=10000))
     live_active = len(get_active_positions(mode="live"))
     live_history = len(get_trade_journal(mode="live", limit=10000))
 
-    print(f"[1] Paper Trading DB  : {get_db_path('paper')}")
-    print(f"    Active Positions  : {paper_active}")
-    print(f"    Completed Trades  : {paper_history}")
-    print(f"[2] Live Real-Money DB: {get_db_path('live')}")
-    print(f"    Active Positions  : {live_active}")
-    print(f"    Completed Trades  : {live_history}")
+    print(f"  [1] Paper Trading DB  : {get_db_path('paper')}")
+    print(f"      Active Open Slots : {paper_active} (Stale: {len(paper_stale)})")
+    print(f"      Completed Trades  : {paper_history}")
+    print(f"  [2] Live Real-Money DB: {get_db_path('live')}")
+    print(f"      Active Open Slots : {live_active} (Stale: {len(live_stale)})")
+    print(f"      Completed Trades  : {live_history}")
     print("-------------------------------------------------------")
     print("STATUS: ✅ Both SQLite databases initialized and ready (WAL Mode & 5000ms Busy Timeout Enabled).")
     print("TIP   : Run 'python -m unittest tests/test_trade_db.py' for full test suite.")

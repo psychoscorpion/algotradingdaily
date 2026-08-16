@@ -121,9 +121,29 @@ class BaseTradingEngine(NorenApi):
         return [f"{s.replace('.NS', '')}-EQ" for s in symbols]
 
     def sync_active_positions_from_db(self, mode: Optional[str] = None) -> int:
-        """Restores open trade state from SQLite database on engine startup/recovery."""
-        from core.trade_db import get_active_positions
-        saved = get_active_positions(mode=mode)
+        """Restores open trade state from SQLite database on engine startup/recovery and logs sanity diagnostics."""
+        from core.trade_db import get_active_positions, get_stale_positions, get_db_path
+        
+        target_mode = (mode or self.config.TRADING_MODE).lower()
+        db_path = get_db_path(target_mode)
+        
+        # 1. Startup Sanity Diagnostics: Detect unclosed trades from previous calendar sessions
+        stale_positions = get_stale_positions(mode=target_mode)
+        if stale_positions:
+            print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] ⚠️ WARNING: Detected {len(stale_positions)} stale/orphan position(s) from past session(s) in {db_path}:")
+            for sp in stale_positions:
+                sym = sp.get('symbol', 'UNKNOWN')
+                ent = sp.get('entry_time', '')
+                qty = sp.get('quantity', 0)
+                ep = sp.get('entry_price', 0.0)
+                age = sp.get('age_str', 'N/A')
+                print(f"    • {sym:<12} | Entry: {ent} | Qty: {qty:>3} | Entry Price: ₹{ep:>8,.2f} | Age: {age}")
+            print(f"    ℹ️  Note: Stale positions are retained for audit and will be resolved in pre-market reconciliation.")
+        else:
+            print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] ✅ Database Sanity Check: 0 stale positions detected in {db_path}.")
+
+        # 2. Restore active positions into in-memory state
+        saved = get_active_positions(mode=target_mode)
         for pos in saved:
             self.active_positions[pos['symbol']] = pos
         print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] 🔄 State synchronized: {len(self.active_positions)} active position(s) loaded from DB.")
