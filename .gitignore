@@ -1,6 +1,12 @@
 # Credentials & Secrets
 .env
 
+# macOS
+.DS_Store
+
+# Internal Documentation (Not for VCS)
+PROJECT_UNDERSTANDING.md
+
 # Virtual Environments
 venv/
 .venv/

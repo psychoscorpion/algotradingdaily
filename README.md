@@ -100,8 +100,9 @@ python -m venv venv
 ```
 
 ### 3. Install dependencies
+All project dependencies are listed in [`requirements.txt`](requirements.txt). Install them with:
 ```bash
-pip install yfinance pandas pandas-ta requests python-dotenv pyotp NorenRestApiPy
+pip install -r requirements.txt
 ```
 
 ### 4. Configure System & Broker Settings
