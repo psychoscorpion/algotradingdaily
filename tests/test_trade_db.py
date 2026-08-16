@@ -133,6 +133,31 @@ class TestTradeDatabase(unittest.TestCase):
                     sync_mode = cursor.fetchone()[0]
                     self.assertEqual(sync_mode, 1, f"Expected synchronous = 1 (NORMAL), got {sync_mode}")
 
+    def test_btree_indexes_exist(self):
+        """Verifies composite B-Tree indexes exist on trade_history and active_positions tables."""
+        from core.trade_db import get_db_connection
+
+        expected_indexes = {
+            "idx_trades_exit_symbol",
+            "idx_trades_entry_time",
+            "idx_active_symbol",
+        }
+
+        for test_mode in ["paper", "live"]:
+            with self.subTest(mode=test_mode):
+                init_db(mode=test_mode)
+                with get_db_connection(mode=test_mode) as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT name FROM sqlite_master WHERE type = 'index';")
+                    existing_indexes = {row[0] for row in cursor.fetchall()}
+                    
+                    for idx_name in expected_indexes:
+                        self.assertIn(
+                            idx_name,
+                            existing_indexes,
+                            f"Index '{idx_name}' missing from '{test_mode}' database schema!"
+                        )
+
 
 if __name__ == "__main__":
     unittest.main()

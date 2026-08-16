@@ -14,7 +14,8 @@ import os
 import sys
 import sqlite3
 import datetime
-from typing import List, Dict, Any, Optional
+from contextlib import contextmanager
+from typing import List, Dict, Any, Optional, Iterator
 
 # Ensure workspace root is in sys.path for direct script execution
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -37,12 +38,14 @@ def get_db_path(mode: Optional[str] = None) -> str:
     return os.path.join(DB_DIR, "paper_trades.db")
 
 
-def get_db_connection(mode: Optional[str] = None) -> sqlite3.Connection:
+@contextmanager
+def get_db_connection(mode: Optional[str] = None) -> Iterator[sqlite3.Connection]:
     """
-    Creates and configures an SQLite database connection with concurrency hardening:
+    Creates and yields an SQLite database connection with concurrency hardening:
       - WAL mode: Enables concurrent readers without blocking writers.
       - busy_timeout: Automatically waits up to 5000ms on lock contention.
       - synchronous: NORMAL mode for optimal performance in WAL mode.
+    Guarantees explicit connection close on context exit.
     """
     db_path = get_db_path(mode)
     conn = sqlite3.connect(db_path, timeout=5.0)
@@ -51,7 +54,10 @@ def get_db_connection(mode: Optional[str] = None) -> sqlite3.Connection:
     cursor.execute("PRAGMA journal_mode = WAL;")
     cursor.execute("PRAGMA busy_timeout = 5000;")
     cursor.execute("PRAGMA synchronous = NORMAL;")
-    return conn
+    try:
+        yield conn
+    finally:
+        conn.close()
 
 
 def init_db(mode: Optional[str] = None) -> None:
@@ -95,6 +101,20 @@ def init_db(mode: Optional[str] = None) -> None:
                 net_pnl REAL NOT NULL,
                 created_at TEXT NOT NULL
             )
+        """)
+
+        # 3. Performance Composite B-Tree Indexes
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_trades_exit_symbol 
+            ON trade_history(exit_time, symbol);
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_trades_entry_time 
+            ON trade_history(entry_time);
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_active_symbol 
+            ON active_positions(symbol, status);
         """)
         conn.commit()
 
