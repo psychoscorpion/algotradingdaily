@@ -134,7 +134,8 @@ SHOONYA_IMEI=shoonya_algo_desktop
 
 ### Run Portfolio Simulation (₹10,000 Capital, 2 Slots):
 ```bash
-python -m backtesting.portfolio_sim
+python -m backtesting.portfolio_sim            # loads from market_data/ archives (fast)
+python -m backtesting.portfolio_sim --refresh  # force re-download of fresh 15m candles
 ```
 
 ### Run Unconstrained Strategy Scanner:

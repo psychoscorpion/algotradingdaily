@@ -6,10 +6,12 @@ from .data_feed import (
     get_nifty50_symbols,
     fetch_nifty_benchmark,
     fetch_stock_candles,
+    load_candle_data,
 )
 
 __all__ = [
     "get_nifty50_symbols",
     "fetch_nifty_benchmark",
     "fetch_stock_candles",
+    "load_candle_data",
 ]

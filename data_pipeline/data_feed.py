@@ -1,10 +1,10 @@
 """
 Market Data Ingestion & Gateway Layer.
 
-Provides unified data utilities:
+Unified data gateway for the project:
   - Dynamic NSE NIFTY 50 constituent retrieval with fallback
-  - NIFTY 50 benchmark downloader with intraday % return calculation
-  - Stock historical candle downloader with optional local CSV caching
+  - NIFTY 50 benchmark downloader with local archiving & intraday % return
+  - Smart stock candle loader with local CSV archiving, freshness checks & force refresh
 """
 
 import io
@@ -41,51 +41,110 @@ def get_nifty50_symbols() -> List[str]:
     return DEFAULT_NIFTY50_FALLBACK
 
 
-def fetch_nifty_benchmark(period: str = "60d", interval: str = "15m") -> pd.Series:
+def _archive_path(symbol: str, interval: str) -> str:
     """
-    Downloads NIFTY 50 Benchmark (^NSEI) and computes intraday % return from Day Open.
-    Returns a Series indexed by timestamp for fast reindexing against stock candles.
+    Returns the local archive CSV path for a ticker.
+    Naming convention: market_data/{SYMBOL}_{interval}.csv
+      e.g. RELIANCE.NS  -> market_data/RELIANCE_15m.csv
+           ^NSEI        -> market_data/NIFTY50_15m.csv
     """
-    print("\n[1/3] Fetching NIFTY 50 Benchmark (^NSEI) for Relative Weakness calculation...")
-    try:
-        nifty_raw = yf.download("^NSEI", period=period, interval=interval, progress=False)
-        if isinstance(nifty_raw.columns, pd.MultiIndex):
-            nifty_raw.columns = nifty_raw.columns.get_level_values(0)
-        nifty_raw['Date'] = nifty_raw.index.date
-        daily_opens = nifty_raw.groupby('Date')['Open'].transform('first')
-        nifty_raw['Nifty_Pct'] = (nifty_raw['Close'] - daily_opens) / daily_opens
-        return nifty_raw['Nifty_Pct']
-    except Exception as e:
-        print(f"⚠️ Warning: Could not fetch Nifty index: {e}")
-        return pd.Series()
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    clean = symbol.replace(".NS", "").replace("^NSEI", "NIFTY50").replace(".", "_")
+    return os.path.join(CACHE_DIR, f"{clean}_{interval}.csv")
 
 
-def fetch_stock_candles(ticker: str, period: str = "60d", interval: str = "15m", use_cache: bool = False) -> Optional[pd.DataFrame]:
+def _is_cache_fresh(df: pd.DataFrame, max_stale_days: int = 2) -> bool:
     """
-    Downloads historical candle data for a given ticker with optional local caching.
-    Flattens multi-index columns and returns clean DataFrame.
+    A local archive is considered fresh if its last candle is within
+    max_stale_days calendar days of today (weekend-safe).
     """
-    cache_path = os.path.join(CACHE_DIR, f"{ticker}_{period}_{interval}.csv")
+    if df is None or df.empty:
+        return False
+    last_ts = df.index[-1]
+    if getattr(last_ts, "tzinfo", None) is not None:
+        last_ts = last_ts.tz_localize(None)
+    gap_days = (pd.Timestamp.now().normalize() - pd.Timestamp(last_ts).normalize()).days
+    return 0 <= gap_days <= max_stale_days
 
-    if use_cache and os.path.exists(cache_path):
+
+def load_candle_data(
+    symbol: str,
+    period: str = "60d",
+    interval: str = "15m",
+    force_refresh: bool = False,
+) -> Optional[pd.DataFrame]:
+    """
+    Smart candle loader with local archiving:
+      1. If a fresh local archive exists (market_data/{SYMBOL}_{interval}.csv),
+         loads instantly from disk.
+      2. Otherwise downloads {period} {interval} candles via yfinance,
+         archives them to market_data/ and returns the DataFrame.
+    """
+    cache_path = _archive_path(symbol, interval)
+
+    if not force_refresh and os.path.exists(cache_path):
         try:
             df = pd.read_csv(cache_path, index_col=0, parse_dates=True)
-            if not df.empty:
+            if len(df) >= 50 and _is_cache_fresh(df):
+                print(f"  📂 {symbol}: loaded from archive ({os.path.basename(cache_path)})")
                 return df
         except Exception:
             pass
 
     try:
-        raw_df = yf.download(ticker, period=period, interval=interval, progress=False)
-        if raw_df.empty or len(raw_df) < 50:
+        raw_df = yf.download(symbol, period=period, interval=interval, progress=False)
+        if raw_df is None or raw_df.empty or len(raw_df) < 50:
             return None
 
         if isinstance(raw_df.columns, pd.MultiIndex):
             raw_df.columns = raw_df.columns.get_level_values(0)
 
-        if use_cache and os.path.exists(CACHE_DIR):
-            raw_df.to_csv(cache_path)
-
+        raw_df.index.name = "Datetime"
+        raw_df.to_csv(cache_path)
+        print(f"  ⬇️  {symbol}: downloaded {len(raw_df)} candles -> archived ({os.path.basename(cache_path)})")
         return raw_df
     except Exception:
         return None
+
+
+def fetch_nifty_benchmark(
+    period: str = "60d",
+    interval: str = "15m",
+    force_refresh: bool = False,
+) -> pd.Series:
+    """
+    Retrieves NIFTY 50 Benchmark (^NSEI) from local archive or yfinance
+    and computes intraday % return from Day Open.
+    Returns a Series indexed by timestamp for fast reindexing against stock candles.
+    """
+    print("\n[1/3] Fetching NIFTY 50 Benchmark (^NSEI) for Relative Weakness calculation...")
+    nifty_raw = load_candle_data("^NSEI", period=period, interval=interval, force_refresh=force_refresh)
+    if nifty_raw is None or nifty_raw.empty:
+        print("⚠️ Warning: Could not fetch Nifty index data.")
+        return pd.Series()
+
+    nifty_raw = nifty_raw.copy()
+    nifty_raw['Date'] = nifty_raw.index.date
+    daily_opens = nifty_raw.groupby('Date')['Open'].transform('first')
+    nifty_raw['Nifty_Pct'] = (nifty_raw['Close'] - daily_opens) / daily_opens
+    return nifty_raw['Nifty_Pct']
+
+
+def fetch_stock_candles(
+    ticker: str,
+    period: str = "60d",
+    interval: str = "15m",
+    use_cache: bool = False,
+    force_refresh: bool = False,
+) -> Optional[pd.DataFrame]:
+    """
+    Backward-compatible alias for load_candle_data.
+    use_cache=True attempts the local archive first (legacy behaviour);
+    use_cache=False forces a fresh download (legacy default).
+    """
+    return load_candle_data(
+        ticker,
+        period=period,
+        interval=interval,
+        force_refresh=force_refresh or (not use_cache),
+    )

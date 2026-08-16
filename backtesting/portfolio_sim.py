@@ -11,6 +11,7 @@ Simulates real-world account execution under realistic trading constraints:
 
 import os
 import sys
+import argparse
 import pandas as pd
 
 # Ensure workspace root is in sys.path for direct script execution
@@ -21,7 +22,7 @@ if hasattr(sys.stdout, 'reconfigure'):
 
 from core.charges import calculate_shoonya_charges
 from core.config import CONFIG, TradingConfig
-from data_pipeline import get_nifty50_symbols, fetch_nifty_benchmark, fetch_stock_candles
+from data_pipeline import get_nifty50_symbols, fetch_nifty_benchmark, load_candle_data
 from strategies.vwap_stoch_breakdown import (
     STRATEGY_NAME,
     evaluate_signals,
@@ -29,7 +30,7 @@ from strategies.vwap_stoch_breakdown import (
 )
 
 
-def scan_universe_signals(symbols, nifty_pct_map, config: TradingConfig = CONFIG):
+def scan_universe_signals(symbols, nifty_pct_map, config: TradingConfig = CONFIG, refresh: bool = False):
     """
     Scans all stock symbols in the universe and compiles all candidate trade signals.
     Returns a DataFrame of all detected signals sorted chronologically by Entry Time.
@@ -39,7 +40,7 @@ def scan_universe_signals(symbols, nifty_pct_map, config: TradingConfig = CONFIG
 
     for ticker in symbols:
         try:
-            raw_df = fetch_stock_candles(ticker, period=config.BACKTEST_PERIOD, interval=config.TIMEFRAME)
+            raw_df = load_candle_data(ticker, period=config.BACKTEST_PERIOD, interval=config.TIMEFRAME, force_refresh=refresh)
             if raw_df is None:
                 continue
 
@@ -126,6 +127,7 @@ def print_simulation_report(tdf: pd.DataFrame, ending_capital: float, total_char
     print(f"      STRATEGY: {STRATEGY_NAME.upper()}")
     print(f"      ₹{initial_capital:,.0f} CAPITAL SIMULATION (MAX {config.MAX_CONCURRENT_POSITIONS} CONCURRENT)   ")
     print("=======================================================")
+    print("Data Source            : Local Archives (market_data/)")
     print(f"Simulation Period      : {start_date} to {end_date} ({trading_days} Trading Days)")
     print(f"Initial Capital        : ₹{initial_capital:,.2f}")
     print(f"Per-Trade Exposure     : ₹{config.per_trade_exposure:,.2f} (₹{config.per_trade_margin:,.0f} x {config.LEVERAGE_MIS} MIS)")
@@ -144,11 +146,15 @@ def print_simulation_report(tdf: pd.DataFrame, ending_capital: float, total_char
     print(tdf['Result'].value_counts())
 
 
-def run_portfolio_simulation(config: TradingConfig = CONFIG):
+def run_portfolio_simulation(config: TradingConfig = CONFIG, refresh: bool = False):
     """Main orchestrator for the portfolio simulation."""
     symbols = get_nifty50_symbols()
-    nifty_pct_map = fetch_nifty_benchmark(period=config.BACKTEST_PERIOD, interval=config.TIMEFRAME)
-    signals_df = scan_universe_signals(symbols, nifty_pct_map, config=config)
+    nifty_pct_map = fetch_nifty_benchmark(
+        period=config.BACKTEST_PERIOD,
+        interval=config.TIMEFRAME,
+        force_refresh=refresh
+    )
+    signals_df = scan_universe_signals(symbols, nifty_pct_map, config=config, refresh=refresh)
 
     tdf, ending_capital, total_charges, _, _ = simulate_portfolio_execution(
         signals_df=signals_df,
@@ -164,4 +170,11 @@ def run_portfolio_simulation(config: TradingConfig = CONFIG):
 
 
 if __name__ == "__main__":
-    run_portfolio_simulation()
+    parser = argparse.ArgumentParser(description="Multi-Stock Chronological Portfolio Simulation")
+    parser.add_argument(
+        "--refresh",
+        action="store_true",
+        help="Force re-download of fresh 15m candles (bypasses local market_data/ archives)"
+    )
+    args = parser.parse_args()
+    run_portfolio_simulation(refresh=args.refresh)

@@ -8,6 +8,7 @@ using the VWAP-Stoch Breakdown strategy from the strategies package.
 import os
 import sys
 import time
+import argparse
 import pandas as pd
 
 # Ensure workspace root is in sys.path for direct script execution
@@ -22,7 +23,7 @@ from strategies.vwap_stoch_breakdown import STRATEGY_NAME, STRATEGY_VERSION
 from backtesting.portfolio_sim import scan_universe_signals
 
 
-def run_strategy_scan(config: TradingConfig = CONFIG):
+def run_strategy_scan(config: TradingConfig = CONFIG, refresh: bool = False):
     symbols = get_nifty50_symbols()
     start_time = time.time()
 
@@ -31,8 +32,12 @@ def run_strategy_scan(config: TradingConfig = CONFIG):
     print(f"  NIFTY 50 ({config.ENTRY_START_HOUR}:00 AM - {config.ENTRY_END_HOUR}:{config.ENTRY_END_MINUTE} | {config.SWING_HIGH_BARS}-Bar Swing High SL)  ")
     print("=======================================================")
 
-    nifty_pct_map = fetch_nifty_benchmark(period=config.BACKTEST_PERIOD, interval=config.TIMEFRAME)
-    signals_df = scan_universe_signals(symbols, nifty_pct_map, config=config)
+    nifty_pct_map = fetch_nifty_benchmark(
+        period=config.BACKTEST_PERIOD,
+        interval=config.TIMEFRAME,
+        force_refresh=refresh
+    )
+    signals_df = scan_universe_signals(symbols, nifty_pct_map, config=config, refresh=refresh)
 
     elapsed = time.time() - start_time
     if signals_df.empty:
@@ -74,4 +79,11 @@ def run_strategy_scan(config: TradingConfig = CONFIG):
 
 
 if __name__ == "__main__":
-    run_strategy_scan()
+    parser = argparse.ArgumentParser(description="Unconstrained Single-Stock Strategy Scanner")
+    parser.add_argument(
+        "--refresh",
+        action="store_true",
+        help="Force re-download of fresh 15m candles (bypasses local market_data/ archives)"
+    )
+    args = parser.parse_args()
+    run_strategy_scan(refresh=args.refresh)
