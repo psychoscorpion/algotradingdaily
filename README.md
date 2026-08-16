@@ -72,6 +72,9 @@ shoonya_algo/
 │   ├── paper_trader.py    # Risk-free virtual paper trading
 │   └── live_trader.py     # Real-money Shoonya OMS order placement
 │
+├── tests/                 # Automated test suites
+│   └── test_trade_db.py   # SQLite CRUD, isolation & zero-pollution verification
+│
 ├── market_data/           # Local candle cache CSVs (git-ignored)
 ├── database/              # SQLite trade journals (git-ignored)
 ├── .env                   # Broker credentials
@@ -151,4 +154,9 @@ python -m live_trading.paper_trader
 ### Run Live Real-Money Execution Engine:
 ```bash
 python -m live_trading.live_trader
+```
+
+### Run Automated Test Suite:
+```bash
+python -m unittest tests/test_trade_db.py
 ```
