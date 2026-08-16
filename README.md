@@ -139,10 +139,14 @@ python -m backtesting.portfolio_sim
 python -m backtesting.scanner
 ```
 
-### Run Virtual Paper Trading Engine:
+### Run Live Market Paper Trading Engine (Safe Simulation):
 ```bash
 python -m live_trading.paper_trader
 ```
+* **Real-time 15m candle loop**: Evaluates breakdown signals on every bar close (:00, :15, :30, :45) during the active window (10:00 AM – 1:30 PM).
+* **+1R Trailing SL**: Automatically moves stop loss to Breakeven in real-time.
+* **3:00 PM Auto-Squareoff**: Automatically exits open positions at 15:00 IST and saves all records to `database/paper_trades.db`.
+* **Daily EOD Performance Report**: Prints an itemized performance summary table on market close or daemon exit.
 
 ### Run Live Real-Money Execution Engine:
 ```bash

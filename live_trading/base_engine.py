@@ -69,6 +69,23 @@ class BaseTradingEngine(NorenApi):
             print(f"⚠️ Shoonya Auth Exception ({e}). Running in Offline Virtual Mode.")
             return False
 
+    def is_market_open(self, now: Optional[datetime.datetime] = None) -> bool:
+        """Checks if current time is within official NSE trading session (09:15 to 15:30 IST on weekdays)."""
+        now = now or datetime.datetime.now()
+        if now.weekday() >= 5:  # Saturday=5, Sunday=6
+            return False
+        t = now.time()
+        market_open = datetime.time(9, 15)
+        market_close = datetime.time(15, 30)
+        return market_open <= t <= market_close
+
+    def is_market_closed(self, now: Optional[datetime.datetime] = None) -> bool:
+        """Checks if today's session has completely concluded (past 15:30 IST or weekend)."""
+        now = now or datetime.datetime.now()
+        if now.weekday() >= 5:
+            return True
+        return now.time() >= datetime.time(15, 30)
+
     def is_entry_window_active(self, now: Optional[datetime.datetime] = None) -> bool:
         """Checks if current time is within allowed entry window (10:00 AM to 1:30 PM)."""
         now = now or datetime.datetime.now()
@@ -83,6 +100,20 @@ class BaseTradingEngine(NorenApi):
         t = now.time()
         sq_time = datetime.time(self.config.SQUAREOFF_HOUR, self.config.SQUAREOFF_MINUTE)
         return t >= sq_time
+
+    def get_seconds_until_next_candle(self, interval_mins: int = 15, now: Optional[datetime.datetime] = None) -> int:
+        """
+        Calculates exact seconds remaining until the next 15-minute candle boundary (:00, :15, :30, :45).
+        Adds a small 3-second buffer to guarantee the candle bar has officially closed.
+        """
+        now = now or datetime.datetime.now()
+        current_minute = now.minute
+        current_second = now.second
+        
+        minutes_into_interval = current_minute % interval_mins
+        minutes_remaining = interval_mins - minutes_into_interval - 1
+        seconds_remaining = (minutes_remaining * 60) + (60 - current_second) + 3
+        return max(seconds_remaining, 5)
 
     def get_trading_universe(self) -> List[str]:
         """Returns symbols formatted for Shoonya NSE cash trading (e.g. INFY-EQ)."""
