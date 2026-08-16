@@ -145,6 +145,34 @@ def print_simulation_report(tdf: pd.DataFrame, ending_capital: float, total_char
     print("Outcome Distribution:")
     print(tdf['Result'].value_counts())
 
+    # Multi-Broker Friction & Net Return Comparison Matrix
+    from core.charges import BROKER_CHARGES_CONFIG
+    
+    print("\n=======================================================")
+    print("       MULTI-BROKER NET PROFIT COMPARISON MATRIX       ")
+    print("=======================================================")
+    print(f"{'Broker Schedule':<24} | {'Total Taxes/Fees':<16} | {'Net Realized PnL':<16} | {'Net ROI %':<10}")
+    print("-----------------------------------------------------------------------------")
+
+    for b_key, b_info in BROKER_CHARGES_CONFIG.items():
+        b_sim_charges = 0.0
+        b_sim_net_pnl = 0.0
+        
+        for _, row in tdf.iterrows():
+            s_turnover = config.per_trade_exposure
+            b_turnover = config.per_trade_exposure * (1.0 - (row['PnL %'] / 100.0))
+            cost = calculate_charges(s_turnover, b_turnover, broker=b_key)
+            raw = config.per_trade_exposure * (row['PnL %'] / 100.0)
+            b_sim_charges += cost
+            b_sim_net_pnl += (raw - cost)
+
+        b_roi = (b_sim_net_pnl / initial_capital) * 100
+        sign = "+" if b_sim_net_pnl >= 0 else "-"
+        abs_pnl = abs(b_sim_net_pnl)
+        print(f"{b_info['name']:<24} | ₹{b_sim_charges:<15,.2f} | {sign}₹{abs_pnl:<14,.2f} | {sign}{abs(b_roi):.2f}%")
+
+    print("=======================================================\n")
+
 
 def run_portfolio_simulation(config: TradingConfig = CONFIG, refresh: bool = False):
     """Main orchestrator for the portfolio simulation."""

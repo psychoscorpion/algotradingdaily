@@ -24,6 +24,11 @@ from typing import Dict, Any, Optional
 
 # Declarative Brokerage Schedules for Major Indian Brokers
 BROKER_CHARGES_CONFIG: Dict[str, Dict[str, Any]] = {
+    "zero": {
+        "name": "Zero-Brokerage Baseline",
+        "brokerage_pct": 0.0,
+        "max_brokerage_per_order": 0.0,
+    },
     "shoonya": {
         "name": "Shoonya (Finvasia)",
         "brokerage_pct": 0.0003,      # 0.03%
@@ -58,11 +63,6 @@ BROKER_CHARGES_CONFIG: Dict[str, Dict[str, Any]] = {
         "name": "Upstox",
         "brokerage_pct": 0.0005,      # 0.05%
         "max_brokerage_per_order": 20.00,
-    },
-    "zero": {
-        "name": "Zero-Brokerage Baseline",
-        "brokerage_pct": 0.0,
-        "max_brokerage_per_order": 0.0,
     },
 }
 
