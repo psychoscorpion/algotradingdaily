@@ -108,6 +108,31 @@ class TestTradeDatabase(unittest.TestCase):
         print("       ALL DATABASE CRUD & ISOLATION TESTS PASSED      ")
         print("=======================================================\n")
 
+    def test_wal_mode_and_concurrency_settings(self):
+        """Verifies SQLite WAL mode, busy timeout (5000ms), and NORMAL synchronous mode."""
+        from core.trade_db import get_db_connection
+
+        for test_mode in ["paper", "live"]:
+            with self.subTest(mode=test_mode):
+                init_db(mode=test_mode)
+                with get_db_connection(mode=test_mode) as conn:
+                    cursor = conn.cursor()
+                    
+                    # 1. Check WAL mode
+                    cursor.execute("PRAGMA journal_mode;")
+                    journal_mode = cursor.fetchone()[0]
+                    self.assertEqual(str(journal_mode).lower(), "wal", f"Expected WAL mode, got {journal_mode}")
+
+                    # 2. Check busy_timeout
+                    cursor.execute("PRAGMA busy_timeout;")
+                    busy_timeout = cursor.fetchone()[0]
+                    self.assertGreaterEqual(busy_timeout, 5000, f"Expected busy_timeout >= 5000ms, got {busy_timeout}")
+
+                    # 3. Check synchronous mode (NORMAL = 1)
+                    cursor.execute("PRAGMA synchronous;")
+                    sync_mode = cursor.fetchone()[0]
+                    self.assertEqual(sync_mode, 1, f"Expected synchronous = 1 (NORMAL), got {sync_mode}")
+
 
 if __name__ == "__main__":
     unittest.main()

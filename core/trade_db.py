@@ -37,12 +37,28 @@ def get_db_path(mode: Optional[str] = None) -> str:
     return os.path.join(DB_DIR, "paper_trades.db")
 
 
+def get_db_connection(mode: Optional[str] = None) -> sqlite3.Connection:
+    """
+    Creates and configures an SQLite database connection with concurrency hardening:
+      - WAL mode: Enables concurrent readers without blocking writers.
+      - busy_timeout: Automatically waits up to 5000ms on lock contention.
+      - synchronous: NORMAL mode for optimal performance in WAL mode.
+    """
+    db_path = get_db_path(mode)
+    conn = sqlite3.connect(db_path, timeout=5.0)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA journal_mode = WAL;")
+    cursor.execute("PRAGMA busy_timeout = 5000;")
+    cursor.execute("PRAGMA synchronous = NORMAL;")
+    return conn
+
+
 def init_db(mode: Optional[str] = None) -> None:
     """
     Initializes the 2-table schema for the specified mode if not already present.
     """
-    db_path = get_db_path(mode)
-    with sqlite3.connect(db_path) as conn:
+    with get_db_connection(mode) as conn:
         cursor = conn.cursor()
         
         # 1. Active Positions Table (for live monitoring & crash recovery)
@@ -96,10 +112,9 @@ def save_active_position(
 ) -> None:
     """Persists a newly opened position in active_positions table."""
     init_db(mode)
-    db_path = get_db_path(mode)
     now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
-    with sqlite3.connect(db_path) as conn:
+    with get_db_connection(mode) as conn:
         cursor = conn.cursor()
         cursor.execute("""
             INSERT OR REPLACE INTO active_positions 
@@ -115,8 +130,7 @@ def save_active_position(
 def update_trailing_sl(symbol: str, new_sl_price: float, mode: str = "paper") -> bool:
     """Updates Stop Loss level when trailing to breakeven."""
     init_db(mode)
-    db_path = get_db_path(mode)
-    with sqlite3.connect(db_path) as conn:
+    with get_db_connection(mode) as conn:
         cursor = conn.cursor()
         cursor.execute("""
             UPDATE active_positions 
@@ -142,11 +156,9 @@ def close_and_archive_position(
     into the trade_history journal.
     """
     init_db(mode)
-    db_path = get_db_path(mode)
     now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
-    with sqlite3.connect(db_path) as conn:
-        conn.row_factory = sqlite3.Row
+    with get_db_connection(mode) as conn:
         cursor = conn.cursor()
         
         # 1. Fetch active position details
@@ -187,9 +199,7 @@ def close_and_archive_position(
 def get_active_positions(mode: str = "paper") -> List[Dict[str, Any]]:
     """Retrieves all open trades on startup or health check."""
     init_db(mode)
-    db_path = get_db_path(mode)
-    with sqlite3.connect(db_path) as conn:
-        conn.row_factory = sqlite3.Row
+    with get_db_connection(mode) as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM active_positions WHERE status != 'CLOSED'")
         return [dict(row) for row in cursor.fetchall()]
@@ -198,9 +208,7 @@ def get_active_positions(mode: str = "paper") -> List[Dict[str, Any]]:
 def get_trade_journal(mode: str = "paper", limit: int = 100) -> List[Dict[str, Any]]:
     """Retrieves completed trade records from trade_history."""
     init_db(mode)
-    db_path = get_db_path(mode)
-    with sqlite3.connect(db_path) as conn:
-        conn.row_factory = sqlite3.Row
+    with get_db_connection(mode) as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM trade_history ORDER BY id DESC LIMIT ?", (limit,))
         return [dict(row) for row in cursor.fetchall()]
@@ -229,6 +237,6 @@ if __name__ == "__main__":
     print(f"    Active Positions  : {live_active}")
     print(f"    Completed Trades  : {live_history}")
     print("-------------------------------------------------------")
-    print("STATUS: ✅ Both SQLite databases initialized and ready.")
+    print("STATUS: ✅ Both SQLite databases initialized and ready (WAL Mode & 5000ms Busy Timeout Enabled).")
     print("TIP   : Run 'python -m unittest tests/test_trade_db.py' for full test suite.")
     print("=======================================================\n")
