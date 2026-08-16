@@ -48,11 +48,15 @@ def scan_universe_signals(symbols, nifty_pct_map, config: TradingConfig = CONFIG
             if df is None:
                 continue
 
-            for i in range(config.SWING_HIGH_BARS, len(df)):
-                if df.iloc[i]['Signal']:
-                    trade = simulate_single_trade(df, i, ticker, config=config)
-                    if trade:
-                        all_signals.append(trade)
+            signal_indices = [
+                i for i in range(config.SWING_HIGH_BARS, len(df))
+                if df['Signal'].values[i]
+            ]
+
+            for i in signal_indices:
+                trade = simulate_single_trade(df, i, ticker, config=config)
+                if trade:
+                    all_signals.append(trade)
         except Exception:
             continue
 
@@ -123,6 +127,26 @@ def print_simulation_report(tdf: pd.DataFrame, ending_capital: float, total_char
     end_date = pd.to_datetime(tdf['Exit Time']).max().strftime('%Y-%m-%d')
     trading_days = len(pd.to_datetime(tdf['Entry Time']).dt.date.unique())
 
+    # Quantitative Risk & Performance Analytics
+    gross_gains = tdf[tdf['Net PnL (₹)'] > 0]['Net PnL (₹)'].sum()
+    gross_losses = abs(tdf[tdf['Net PnL (₹)'] <= 0]['Net PnL (₹)'].sum())
+    profit_factor = (gross_gains / gross_losses) if gross_losses > 0 else float('inf')
+
+    # Max Drawdown (MDD) on Capital Curve
+    cum_equity = tdf['Capital']
+    running_peak = cum_equity.cummax()
+    drawdown_series = cum_equity - running_peak
+    mdd_val = abs(drawdown_series.min()) if not drawdown_series.empty else 0.0
+    # Peak capital at time of MDD trough
+    trough_idx = drawdown_series.idxmin() if not drawdown_series.empty else 0
+    peak_at_trough = running_peak.loc[trough_idx] if not drawdown_series.empty else initial_capital
+    mdd_pct = (mdd_val / peak_at_trough) * 100 if peak_at_trough > 0 else 0.0
+
+    # Trade Expectancy & Averages
+    expectancy = net_profit / total_trades if total_trades > 0 else 0.0
+    avg_win = gross_gains / win_count if win_count > 0 else 0.0
+    avg_loss = gross_losses / loss_count if loss_count > 0 else 0.0
+
     print("\n=======================================================")
     print(f"      STRATEGY: {STRATEGY_NAME.upper()}")
     print(f"      ₹{initial_capital:,.0f} CAPITAL SIMULATION (MAX {config.MAX_CONCURRENT_POSITIONS} CONCURRENT)   ")
@@ -132,8 +156,7 @@ def print_simulation_report(tdf: pd.DataFrame, ending_capital: float, total_char
     print(f"Initial Capital        : ₹{initial_capital:,.2f}")
     print(f"Per-Trade Exposure     : ₹{config.per_trade_exposure:,.2f} (₹{config.per_trade_margin:,.0f} x {config.LEVERAGE_MIS} MIS)")
     print(f"Total Trades Taken     : {total_trades}")
-    print(f"Winning Trades         : {win_count}")
-    print(f"Losing Trades          : {loss_count}")
+    print(f"Winning Trades         : {win_count} | Losing Trades: {loss_count}")
     print(f"Win Rate               : {win_rate:.2f}%")
     print("-------------------------------------------------------")
     print(f"Gross Profit (Pre-Tax) : ₹{gross_profit:,.2f} (+{gross_return_pct:.2f}%)")
@@ -141,9 +164,16 @@ def print_simulation_report(tdf: pd.DataFrame, ending_capital: float, total_char
     print(f"Total Net Profit       : ₹{net_profit:,.2f} (Post-All Charges)")
     print(f"Ending Capital Balance : ₹{ending_capital:,.2f}")
     print(f"Net Return             : {net_return_pct:.2f}%")
+    print("-------------------------------------------------------")
+    print(f"Profit Factor          : {profit_factor:.2f}")
+    print(f"Max Drawdown (MDD)     : ₹{mdd_val:,.2f} (-{mdd_pct:.2f}%)")
+    print(f"Trade Expectancy       : +₹{expectancy:.2f} / trade" if expectancy >= 0 else f"Trade Expectancy       : -₹{abs(expectancy):.2f} / trade")
+    print(f"Avg Win / Avg Loss     : +₹{avg_win:,.2f} / -₹{avg_loss:,.2f}")
     print("=======================================================\n")
     print("Outcome Distribution:")
-    print(tdf['Result'].value_counts())
+    for result_name, count in tdf['Result'].value_counts().items():
+        pct = (count / total_trades) * 100
+        print(f"  • {result_name:<20} : {count:>3} trades ({pct:>5.1f}%)")
 
     # Multi-Broker Friction & Net Return Comparison Matrix
     from core.charges import BROKER_CHARGES_CONFIG

@@ -75,7 +75,9 @@ def run_strategy_scan(config: TradingConfig = CONFIG, refresh: bool = False):
     print(f"Cumulative Return      : {net_pnl:.2f}% (Unleveraged, Unconstrained)")
     print("=======================================================\n")
     print("Outcome Distribution:")
-    print(tdf['Result'].value_counts())
+    for result_name, count in tdf['Result'].value_counts().items():
+        pct = (count / total) * 100
+        print(f"  • {result_name:<20} : {count:>3} trades ({pct:>5.1f}%)")
 
 
 if __name__ == "__main__":

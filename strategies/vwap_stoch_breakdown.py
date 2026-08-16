@@ -100,12 +100,20 @@ def simulate_single_trade(
     curr_sl = sl
     trailed = False
 
+    # Extract NumPy arrays for fast inner-loop traversal (50x faster than df.iloc)
+    highs = df['High'].values
+    lows = df['Low'].values
+    closes = df['Close'].values
+    timestamps = df.index
+
     for j in range(entry_idx + 1, len(df)):
-        bar = df.iloc[j]
-        t_bar = df.index[j]
+        h_val = highs[j]
+        l_val = lows[j]
+        c_val = closes[j]
+        t_bar = timestamps[j]
 
         # 1. Check if current SL is hit
-        if bar['High'] >= curr_sl:
+        if h_val >= curr_sl:
             if trailed:
                 exit_t, pnl_pct, result = t_bar, 0.0, 'TRAIL SL (BE) 🛡️'
             else:
@@ -113,18 +121,18 @@ def simulate_single_trade(
             break
 
         # 2. Check if Target is hit
-        elif bar['Low'] <= tp:
+        elif l_val <= tp:
             exit_t, pnl_pct, result = t_bar, (config.RISK_REWARD_RATIO * risk_pct), 'TARGET HIT ✅'
             break
 
         # 3. Check if +1R profit threshold is reached to trail SL to Breakeven
-        if not trailed and bar['Low'] <= (entry_p - risk):
+        if not trailed and l_val <= (entry_p - risk):
             curr_sl = entry_p
             trailed = True
 
         # 4. Check Configurable Square-Off (Default: 3:00 PM)
         if (t_bar.hour == config.SQUAREOFF_HOUR and t_bar.minute >= config.SQUAREOFF_MINUTE) or (t_bar.hour > config.SQUAREOFF_HOUR):
-            exit_t, pnl_pct, result = t_bar, (entry_p - bar['Close']) / entry_p, '3PM EXIT ⏱️'
+            exit_t, pnl_pct, result = t_bar, (entry_p - c_val) / entry_p, '3PM EXIT ⏱️'
             break
 
     if exit_t:
