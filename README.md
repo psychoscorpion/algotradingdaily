@@ -43,6 +43,9 @@ An automated intraday trading execution engine and portfolio simulator built in 
 | **Total Net Profit** | **+₹3,036.99 (Post-All Charges)** |
 | **Net Return** | **+30.37%** |
 | **Ending Capital Balance** | **₹13,036.99** |
+| **Profit Factor** | 1.70 (Gross Profits / Gross Losses) |
+| **Max Drawdown (MDD)** | ₹1,114.18 (−8.74%) |
+| **Trade Expectancy** | +₹23.18 / trade |
 
 ---
 
@@ -144,6 +147,7 @@ SHOONYA_IMEI=shoonya_algo_desktop
 python -m backtesting.portfolio_sim            # loads from market_data/ archives (fast)
 python -m backtesting.portfolio_sim --refresh  # force re-download of fresh 15m candles
 ```
+* All 50 NIFTY 50 constituents are scanned **in parallel (8 workers)** with vectorized signal extraction; a full `--refresh` re-download completes in ~6s.
 
 ### Run Unconstrained Strategy Scanner:
 ```bash

@@ -72,6 +72,7 @@ def load_candle_data(
     period: str = "60d",
     interval: str = "15m",
     force_refresh: bool = False,
+    verbose: bool = True,
 ) -> Optional[pd.DataFrame]:
     """
     Smart candle loader with local archiving:
@@ -86,7 +87,8 @@ def load_candle_data(
         try:
             df = pd.read_csv(cache_path, index_col=0, parse_dates=True)
             if len(df) >= 50 and _is_cache_fresh(df):
-                print(f"  📂 {symbol}: loaded from archive ({os.path.basename(cache_path)})")
+                if verbose:
+                    print(f"  📂 {symbol}: loaded from archive ({os.path.basename(cache_path)})")
                 return df
         except Exception:
             pass
@@ -101,7 +103,8 @@ def load_candle_data(
 
         raw_df.index.name = "Datetime"
         raw_df.to_csv(cache_path)
-        print(f"  ⬇️  {symbol}: downloaded {len(raw_df)} candles -> archived ({os.path.basename(cache_path)})")
+        if verbose:
+            print(f"  ⬇️  {symbol}: downloaded {len(raw_df)} candles -> archived ({os.path.basename(cache_path)})")
         return raw_df
     except Exception:
         return None

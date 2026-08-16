@@ -12,6 +12,9 @@ Simulates real-world account execution under realistic trading constraints:
 import os
 import sys
 import argparse
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+import numpy as np
 import pandas as pd
 
 # Ensure workspace root is in sys.path for direct script execution
@@ -30,35 +33,71 @@ from strategies.vwap_stoch_breakdown import (
 )
 
 
+def _scan_single_symbol(ticker, nifty_pct_map, config: TradingConfig, refresh: bool):
+    """
+    Worker: loads candles, evaluates indicators, and simulates all trades for one symbol.
+    Returns (ticker, trades). Owns its DataFrame exclusively -> thread-safe.
+    """
+    try:
+        raw_df = load_candle_data(
+            ticker,
+            period=config.BACKTEST_PERIOD,
+            interval=config.TIMEFRAME,
+            force_refresh=refresh,
+            verbose=False,
+        )
+        if raw_df is None:
+            return ticker, []
+
+        df = evaluate_signals(raw_df, nifty_pct_map, config=config)
+        if df is None:
+            return ticker, []
+
+        signal_positions = np.flatnonzero(df['Signal'].to_numpy())
+        signal_indices = signal_positions[signal_positions >= config.SWING_HIGH_BARS].tolist()
+
+        trades = []
+        for i in signal_indices:
+            trade = simulate_single_trade(df, i, ticker, config=config)
+            if trade:
+                trades.append(trade)
+        return ticker, trades
+    except Exception:
+        return ticker, []
+
+
 def scan_universe_signals(symbols, nifty_pct_map, config: TradingConfig = CONFIG, refresh: bool = False):
     """
-    Scans all stock symbols in the universe and compiles all candidate trade signals.
-    Returns a DataFrame of all detected signals sorted chronologically by Entry Time.
+    Scans all stock symbols in the universe in parallel (8 workers) and compiles
+    all candidate trade signals. Returns a DataFrame of all detected signals
+    sorted chronologically by Entry Time.
     """
     all_signals = []
-    print("[2/3] Scanning Nifty 50 constituents with RELATIVE WEAKNESS filter...")
+    total = len(symbols)
+    print(f"[2/3] Scanning Nifty 50 constituents with RELATIVE WEAKNESS filter ({total} symbols, 8 parallel workers)...")
 
-    for ticker in symbols:
-        try:
-            raw_df = load_candle_data(ticker, period=config.BACKTEST_PERIOD, interval=config.TIMEFRAME, force_refresh=refresh)
-            if raw_df is None:
-                continue
+    if not symbols:
+        return pd.DataFrame()
 
-            df = evaluate_signals(raw_df, nifty_pct_map, config=config)
-            if df is None:
-                continue
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        futures = {
+            ticker: executor.submit(_scan_single_symbol, ticker, nifty_pct_map, config, refresh)
+            for ticker in symbols
+        }
 
-            signal_indices = [
-                i for i in range(config.SWING_HIGH_BARS, len(df))
-                if df['Signal'].values[i]
-            ]
+        done = 0
+        for _ in as_completed(futures.values()):
+            done += 1
+            if done % 5 == 0 or done == total:
+                print(f"      ✓ {done}/{total} symbols scanned", end="\r")
+        print()
 
-            for i in signal_indices:
-                trade = simulate_single_trade(df, i, ticker, config=config)
-                if trade:
-                    all_signals.append(trade)
-        except Exception:
-            continue
+        # Collect in original symbol order so the downstream chronological sort
+        # sees identical input to a sequential run -> exact numerical parity.
+        for ticker in symbols:
+            _, trades = futures[ticker].result()
+            if trades:
+                all_signals.extend(trades)
 
     if not all_signals:
         return pd.DataFrame()
@@ -99,7 +138,8 @@ def simulate_portfolio_execution(signals_df: pd.DataFrame, config: TradingConfig
                 executed_trades.append({
                     'Symbol': sig['Symbol'], 'Entry Time': sig['Entry Time'],
                     'Exit Time': sig['Exit Time'], 'PnL %': sig['PnL %'] * 100,
-                    'Net PnL (₹)': net_pnl, 'Capital': capital, 'Result': sig['Result']
+                    'Gross PnL (₹)': raw_pnl, 'Net PnL (₹)': net_pnl,
+                    'Capital': capital, 'Result': sig['Result']
                 })
                 active_trades.append(sig)
 
@@ -128,8 +168,8 @@ def print_simulation_report(tdf: pd.DataFrame, ending_capital: float, total_char
     trading_days = len(pd.to_datetime(tdf['Entry Time']).dt.date.unique())
 
     # Quantitative Risk & Performance Analytics
-    gross_gains = tdf[tdf['Net PnL (₹)'] > 0]['Net PnL (₹)'].sum()
-    gross_losses = abs(tdf[tdf['Net PnL (₹)'] <= 0]['Net PnL (₹)'].sum())
+    gross_gains = tdf[tdf['Gross PnL (₹)'] > 0]['Gross PnL (₹)'].sum()
+    gross_losses = abs(tdf[tdf['Gross PnL (₹)'] <= 0]['Gross PnL (₹)'].sum())
     profit_factor = (gross_gains / gross_losses) if gross_losses > 0 else float('inf')
 
     # Max Drawdown (MDD) on Capital Curve
