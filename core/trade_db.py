@@ -209,69 +209,26 @@ def get_trade_journal(mode: str = "paper", limit: int = 100) -> List[Dict[str, A
 if __name__ == "__main__":
     if hasattr(sys.stdout, 'reconfigure'):
         sys.stdout.reconfigure(encoding='utf-8')
-        
+
     print("\n=======================================================")
-    print("       RUNNING TRADE_DB ISOLATED VERIFICATION TEST")
-    print("=======================================================\n")
-    
-    test_probe_symbol = f"__TEST_PROBE_{int(datetime.datetime.now().timestamp())}__"
-    
-    for test_mode in ["paper", "live"]:
-        print(f"[*] Testing database mode: '{test_mode}' -> {get_db_path(test_mode)}")
-        init_db(mode=test_mode)
-        
-        # 1. Measure baseline
-        initial_active = len(get_active_positions(mode=test_mode))
-        initial_history = len(get_trade_journal(mode=test_mode))
-        
-        # 2. Create probe position
-        save_active_position(
-            symbol=test_probe_symbol,
-            entry_order_id="TEST_ORD_001",
-            sl_order_id="TEST_SL_001",
-            qty=10,
-            entry_p=1500.0,
-            sl_p=1510.0,
-            tp_p=1480.0,
-            order_type="BO",
-            mode=test_mode
-        )
-        assert len(get_active_positions(mode=test_mode)) == initial_active + 1, "Failed to insert probe active position"
-        
-        # 3. Update trailing SL
-        trailed = update_trailing_sl(symbol=test_probe_symbol, new_sl_price=1500.0, mode=test_mode)
-        assert trailed, "Failed to update trailing SL"
-        
-        # 4. Close and archive position
-        archived = close_and_archive_position(
-            symbol=test_probe_symbol,
-            exit_price=1480.0,
-            exit_time=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            result="TARGET HIT ✅",
-            gross_pnl=200.0,
-            taxes_fees=15.5,
-            net_pnl=184.5,
-            mode=test_mode
-        )
-        assert archived, "Failed to archive probe position"
-        assert len(get_active_positions(mode=test_mode)) == initial_active, "Active positions count mismatch after close"
-        assert len(get_trade_journal(mode=test_mode)) == initial_history + 1, "Trade history count mismatch after archive"
-        
-        # 5. Targeted probe cleanup (zero pollution)
-        db_path = get_db_path(test_mode)
-        with sqlite3.connect(db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM active_positions WHERE symbol = ?", (test_probe_symbol,))
-            cursor.execute("DELETE FROM trade_history WHERE symbol = ?", (test_probe_symbol,))
-            conn.commit()
-            
-        final_active = len(get_active_positions(mode=test_mode))
-        final_history = len(get_trade_journal(mode=test_mode))
-        assert final_active == initial_active, f"Active table leaked rows! ({final_active} != {initial_active})"
-        assert final_history == initial_history, f"History table leaked rows! ({final_history} != {initial_history})"
-        
-        print(f"    ✅ '{test_mode}' DB verified: CRUD, Atomic Archiving & Zero-Pollution Cleanup Passed.")
-        
-    print("\n=======================================================")
-    print("       ALL DATABASE CRUD & ISOLATION TESTS PASSED")
+    print("       TRADE DATABASE MODULE (core/trade_db.py)")
+    print("=======================================================")
+
+    init_db("paper")
+    init_db("live")
+
+    paper_active = len(get_active_positions(mode="paper"))
+    paper_history = len(get_trade_journal(mode="paper", limit=10000))
+    live_active = len(get_active_positions(mode="live"))
+    live_history = len(get_trade_journal(mode="live", limit=10000))
+
+    print(f"[1] Paper Trading DB  : {get_db_path('paper')}")
+    print(f"    Active Positions  : {paper_active}")
+    print(f"    Completed Trades  : {paper_history}")
+    print(f"[2] Live Real-Money DB: {get_db_path('live')}")
+    print(f"    Active Positions  : {live_active}")
+    print(f"    Completed Trades  : {live_history}")
+    print("-------------------------------------------------------")
+    print("STATUS: ✅ Both SQLite databases initialized and ready.")
+    print("TIP   : Run 'python -m unittest tests/test_trade_db.py' for full test suite.")
     print("=======================================================\n")
