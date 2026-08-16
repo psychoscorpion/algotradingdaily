@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 
-from core.charges import calculate_shoonya_charges
+from core.charges import calculate_charges
 from core.config import CONFIG, TradingConfig
 from data_pipeline import get_nifty50_symbols, fetch_nifty_benchmark, load_candle_data
 from strategies.vwap_stoch_breakdown import (
@@ -85,7 +85,7 @@ def simulate_portfolio_execution(signals_df: pd.DataFrame, config: TradingConfig
                 sell_turnover = trade_exposure
                 buy_turnover = trade_exposure * (1.0 - sig['PnL %'])
 
-                trade_cost = calculate_shoonya_charges(sell_turnover, buy_turnover)
+                trade_cost = calculate_charges(sell_turnover, buy_turnover)
                 total_charges_paid += trade_cost
 
                 raw_pnl = trade_exposure * sig['PnL %']

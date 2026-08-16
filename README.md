@@ -54,7 +54,7 @@ shoonya_algo/
 │   ├── config.py          # Centralized TradingConfig dataclass & .env overrides
 │   ├── trade_db.py        # Isolated SQLite trade journals & crash recovery state
 │   ├── indicators.py      # Stoch RSI, ADX, VWAP, Relative Weakness formulas
-│   └── charges.py         # Shoonya STT, GST, brokerage & friction math
+│   └── charges.py         # Universal Indian taxes & multi-broker fee engine
 │
 ├── strategies/            # Trading strategies layer (one module per strategy)
 │   └── vwap_stoch_breakdown.py # Rules, entry/exit criteria & single-trade lifecycle
@@ -73,7 +73,8 @@ shoonya_algo/
 │   └── live_trader.py     # Real-money Shoonya OMS order placement
 │
 ├── tests/                 # Automated test suites
-│   └── test_trade_db.py   # SQLite CRUD, isolation & zero-pollution verification
+│   ├── test_trade_db.py   # SQLite CRUD, isolation & zero-pollution verification
+│   └── test_charges.py    # Multi-broker fee engine & statutory tax verification
 │
 ├── market_data/           # Local candle cache CSVs (git-ignored)
 ├── database/              # SQLite trade journals (git-ignored)
@@ -109,7 +110,12 @@ System defaults are centrally defined in [`core/config.py`](core/config.py). You
 Create a `.env` file in the root directory:
 ```env
 # -------------------------------------------------------------
-# 1. Mandatory Broker Credentials (Finvasia Shoonya)
+# 1. Active Broker Selection (SHOONYA | ZERODHA | DHAN | GROWW | ZERO)
+# -------------------------------------------------------------
+ACTIVE_BROKER=SHOONYA
+
+# -------------------------------------------------------------
+# 2. Broker Credentials (Finvasia Shoonya)
 # -------------------------------------------------------------
 SHOONYA_USER=your_user_id
 SHOONYA_PWD=your_password
@@ -119,13 +125,13 @@ SHOONYA_TOTP_KEY=your_totp_secret_key
 SHOONYA_IMEI=shoonya_algo_desktop
 
 # -------------------------------------------------------------
-# 2. Optional Overrides (Defaults are active in core/config.py)
+# 3. Strategy & Risk Configuration Overrides
 # -------------------------------------------------------------
-# TRADING_MODE=paper              # Default: paper (paper_trades.db) | live (live_trades.db)
-# ORDER_TYPE=BO                   # Default: BO (Bracket Order) | MIS (Standard Margin)
-# INITIAL_CAPITAL=10000.0         # Default: ₹10,000.00
-# MAX_CONCURRENT_POSITIONS=2      # Default: 2 open trade slots
-# LEVERAGE_MIS=5                  # Default: 5x intraday MIS leverage
+# TRADING_MODE=paper              # paper (paper_trades.db) | live (live_trades.db)
+# ORDER_TYPE=BO                   # BO (Bracket Order) | MIS (Standard Margin)
+# INITIAL_CAPITAL=10000.0         # Baseline capital in ₹
+# MAX_CONCURRENT_POSITIONS=2      # Max active slots
+# LEVERAGE_MIS=5                  # MIS leverage multiplier
 ```
 
 ---
@@ -159,5 +165,10 @@ python -m live_trading.live_trader
 
 ### Run Automated Test Suite:
 ```bash
+# Run all unit tests
+python -m unittest discover tests
+
+# Or run individual test modules:
+python -m unittest tests/test_charges.py
 python -m unittest tests/test_trade_db.py
 ```

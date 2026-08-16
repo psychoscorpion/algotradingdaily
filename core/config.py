@@ -16,6 +16,9 @@ load_dotenv()
 
 @dataclass(frozen=True)
 class TradingConfig:
+    # Active Broker Selection (shoonya, zerodha, dhan, groww, zero)
+    ACTIVE_BROKER: str = os.getenv("ACTIVE_BROKER", "shoonya").lower()
+
     # Portfolio Capital & Allocation
     INITIAL_CAPITAL: float = float(os.getenv("INITIAL_CAPITAL", "10000.0"))
     MAX_CONCURRENT_POSITIONS: int = int(os.getenv("MAX_CONCURRENT_POSITIONS", "2"))

@@ -110,15 +110,18 @@ class PaperTradingEngine(BaseTradingEngine):
 
     def _close_position(self, symbol: str, exit_price: float, result: str, exit_time: Optional[str] = None) -> Dict[str, Any]:
         """Closes virtual position, computes fees, logs result, and archives to SQLite database."""
-        from core.charges import calculate_shoonya_charges
+        from core.charges import calculate_charges
         from core.trade_db import close_and_archive_position
 
         pos = self.active_positions.pop(symbol)
-        sell_turnover = pos['entry_price'] * pos['qty']  # Short entry (Sell)
-        buy_turnover = exit_price * pos['qty']           # Exit cover (Buy)
-        raw_pnl = (pos['entry_price'] - exit_price) * pos['qty']
-        charges = calculate_shoonya_charges(sell_turnover=sell_turnover, buy_turnover=buy_turnover)
-        net_pnl = raw_pnl - charges
+        entry_p = pos['entry_price']
+        qty = pos['qty']
+        
+        gross_pnl = (entry_p - exit_price) * qty
+        sell_turnover = entry_p * qty
+        buy_turnover = exit_price * qty
+        charges = calculate_charges(sell_turnover=sell_turnover, buy_turnover=buy_turnover)
+        net_pnl = gross_pnl - charges
         pnl_pct = (pos['entry_price'] - exit_price) / pos['entry_price'] * 100
         actual_exit_time = exit_time or datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
