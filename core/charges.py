@@ -92,7 +92,7 @@ def calculate_charges(
     Returns:
         float: Total friction in INR (brokerage + STT + exchange + SEBI + stamp duty + GST)
     """
-    active_broker = (broker or os.getenv("ACTIVE_BROKER", "shoonya")).lower()
+    active_broker = (broker or "shoonya").lower()
     rates = BROKER_CHARGES_CONFIG.get(active_broker, BROKER_CHARGES_CONFIG["shoonya"])
 
     entry_brokerage = min(sell_turnover * rates["brokerage_pct"], rates["max_brokerage_per_order"])

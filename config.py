@@ -15,8 +15,8 @@ load_dotenv()
 
 @dataclass(frozen=True)
 class TradingConfig:
-    # Active Broker Selection (from env or default)
-    ACTIVE_BROKER: str = os.getenv("ACTIVE_BROKER", "shoonya").lower()
+    # Active Broker Default (shoonya | zerodha | dhan | groww | angelone | upstox | fyers | zero)
+    ACTIVE_BROKER: str = "shoonya"
 
     # Portfolio Capital & Allocation Defaults
     INITIAL_CAPITAL: float = 10000.0
@@ -29,6 +29,7 @@ class TradingConfig:
 
     # Strategy Entry Timing Windows (IST)
     ENTRY_START_HOUR: int = 10
+    ENTRY_START_MINUTE: int = 0
     ENTRY_END_HOUR: int = 13
     ENTRY_END_MINUTE: int = 30
 
@@ -37,8 +38,8 @@ class TradingConfig:
     SQUAREOFF_MINUTE: int = 0
 
     # Execution Mode Defaults
-    TRADING_MODE: str = "paper"
-    ORDER_TYPE: str = "BO"
+    TRADING_MODE: str = "paper"  # Execution sandbox: "paper" (paper_trades.db) | "live" (live_trades.db)
+    ORDER_TYPE: str = "BO"       # Order type: "BO" (Bracket Order with exchange SL) | "MIS" (Margin Intraday Square-off)
 
     # Risk Management Rules
     MIN_SL_BUFFER_PCT: float = 0.0020      # 0.2% min SL buffer above entry

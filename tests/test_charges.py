@@ -70,13 +70,10 @@ class TestChargesEngine(unittest.TestCase):
         self.assertEqual(groww_breakdown["brokerage"], 24.50)
         self.assertEqual(angel_breakdown["brokerage"], 40.00)
 
-    def test_dynamic_active_broker_resolution(self):
-        """Verifies calculate_charges automatically uses ACTIVE_BROKER env if broker argument is omitted."""
-        os.environ["ACTIVE_BROKER"] = "zerodha"
-        zerodha_charges = calculate_charges(self.sell_turnover, self.buy_turnover)
-        
-        os.environ["ACTIVE_BROKER"] = "shoonya"
-        shoonya_charges = calculate_charges(self.sell_turnover, self.buy_turnover)
+    def test_broker_charges_comparison(self):
+        """Verifies calculate_charges accurately calculates different brokerage schedules."""
+        zerodha_charges = calculate_charges(self.sell_turnover, self.buy_turnover, broker="zerodha")
+        shoonya_charges = calculate_charges(self.sell_turnover, self.buy_turnover, broker="shoonya")
 
         self.assertGreater(zerodha_charges, shoonya_charges)
 

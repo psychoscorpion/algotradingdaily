@@ -97,7 +97,7 @@ class BaseTradingEngine(NorenApi):
         """Checks if current time is within allowed entry window (10:00 AM to 1:30 PM)."""
         now = now or datetime.datetime.now()
         t = now.time()
-        start = datetime.time(self.config.ENTRY_START_HOUR, 0)
+        start = datetime.time(self.config.ENTRY_START_HOUR, self.config.ENTRY_START_MINUTE)
         end = datetime.time(self.config.ENTRY_END_HOUR, self.config.ENTRY_END_MINUTE)
         return start <= t <= end
 

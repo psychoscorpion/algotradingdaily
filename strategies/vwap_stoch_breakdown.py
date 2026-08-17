@@ -54,7 +54,10 @@ def evaluate_signals(
 
     # 3. Time Filter: Configurable Entry Window (Default: 10:00 AM to 1:30 PM IST)
     time_filter = (
-        (df.index.hour >= config.ENTRY_START_HOUR) & 
+        (
+            (df.index.hour > config.ENTRY_START_HOUR) | 
+            ((df.index.hour == config.ENTRY_START_HOUR) & (df.index.minute >= config.ENTRY_START_MINUTE))
+        ) & 
         (
             (df.index.hour < config.ENTRY_END_HOUR) | 
             ((df.index.hour == config.ENTRY_END_HOUR) & (df.index.minute <= config.ENTRY_END_MINUTE))
