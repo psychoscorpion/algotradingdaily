@@ -44,9 +44,10 @@ class TradingConfig:
     ORDER_TYPE: str = os.getenv("ORDER_TYPE", "BO").upper()
 
     # Risk Management Settings
-    MIN_SL_BUFFER_PCT: float = float(os.getenv("MIN_SL_BUFFER_PCT", "0.002"))  # 0.2% min SL buffer
-    SWING_HIGH_BARS: int = int(os.getenv("SWING_HIGH_BARS", "3"))             # 3-bar swing high
-    RISK_REWARD_RATIO: float = float(os.getenv("RISK_REWARD_RATIO", "2.0"))   # 1:2 R:R target
+    MIN_SL_BUFFER_PCT: float = float(os.getenv("MIN_SL_BUFFER_PCT", "0.002"))      # 0.2% min SL buffer above entry
+    SWING_SL_BUFFER_PCT: float = float(os.getenv("SWING_SL_BUFFER_PCT", "0.0005"))  # 0.05% anti-wick buffer above swing high
+    SWING_HIGH_BARS: int = int(os.getenv("SWING_HIGH_BARS", "3"))                 # 3-bar swing high lookback
+    RISK_REWARD_RATIO: float = float(os.getenv("RISK_REWARD_RATIO", "2.0"))       # 1:2 R:R target
 
     # Computed Properties
     @property

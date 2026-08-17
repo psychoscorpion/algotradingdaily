@@ -77,7 +77,8 @@ shoonya_algo/
 │
 ├── tests/                 # Automated test suites
 │   ├── test_trade_db.py   # SQLite CRUD, isolation & zero-pollution verification
-│   └── test_charges.py    # Multi-broker fee engine & statutory tax verification
+│   ├── test_charges.py    # Multi-broker fee engine & statutory tax verification
+│   └── test_strategy_parity.py # Exact numerical parity between backtesting and live execution
 │
 ├── market_data/           # Local candle cache CSVs (git-ignored)
 ├── database/              # SQLite trade journals (git-ignored)
@@ -136,6 +137,8 @@ SHOONYA_IMEI=shoonya_algo_desktop
 # INITIAL_CAPITAL=10000.0         # Baseline capital in ₹
 # MAX_CONCURRENT_POSITIONS=2      # Max active slots
 # LEVERAGE_MIS=5                  # MIS leverage multiplier
+# SWING_SL_BUFFER_PCT=0.0005      # 0.05% anti-wick buffer above 3-bar swing high
+# MIN_SL_BUFFER_PCT=0.0020        # 0.20% minimum risk floor above entry price
 ```
 
 ---
@@ -176,4 +179,5 @@ python -m unittest discover tests
 # Or run individual test modules:
 python -m unittest tests/test_charges.py
 python -m unittest tests/test_trade_db.py
+python -m unittest tests/test_strategy_parity.py
 ```

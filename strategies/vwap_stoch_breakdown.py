@@ -91,7 +91,7 @@ def simulate_single_trade(
     entry_t = df.index[entry_idx]
     entry_p = df.iloc[entry_idx]['Close']
     swing_high = df.iloc[entry_idx - config.SWING_HIGH_BARS : entry_idx]['High'].max()
-    sl = max(swing_high * 1.0005, entry_p * (1.0 + config.MIN_SL_BUFFER_PCT))
+    sl = max(swing_high * (1.0 + config.SWING_SL_BUFFER_PCT), entry_p * (1.0 + config.MIN_SL_BUFFER_PCT))
     risk = sl - entry_p
     risk_pct = risk / entry_p
     tp = entry_p - (config.RISK_REWARD_RATIO * risk)
