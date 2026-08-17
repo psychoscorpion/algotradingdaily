@@ -82,7 +82,8 @@ shoonya_algo/
 │
 ├── market_data/           # Local candle cache CSVs (git-ignored)
 ├── database/              # SQLite trade journals (git-ignored)
-├── .env                   # Broker credentials
+├── .env.example           # Public secrets template with placeholder values
+├── .env                   # Private broker credentials (git-ignored)
 └── README.md
 ```
 
@@ -109,37 +110,29 @@ All project dependencies are listed in [`requirements.txt`](requirements.txt). I
 pip install -r requirements.txt
 ```
 
-### 4. Configure System & Broker Settings
-System defaults are centrally defined in [`core/config.py`](core/config.py). You only need to provide your broker credentials in `.env`. Any strategy or portfolio setting can optionally be overridden in `.env` without editing Python code:
+### 4. Configure Broker Credentials (.env)
+Copy the public template file [`.env.example`](.env.example) to `.env` and fill in your confidential broker API keys:
 
-Create a `.env` file in the root directory:
+```bash
+# Windows (PowerShell)
+Copy-Item .env.example .env
+
+# Linux / macOS
+cp .env.example .env
+```
+
+Edit `.env` with your private broker credentials (templates for Shoonya, Zerodha, Dhan, Groww, Angel One, Upstox, and Fyers are included in [`.env.example`](.env.example)):
 ```env
-# -------------------------------------------------------------
-# 1. Active Broker Selection (SHOONYA | ZERODHA | DHAN | GROWW | ZERO)
-# -------------------------------------------------------------
-ACTIVE_BROKER=SHOONYA
-
-# -------------------------------------------------------------
-# 2. Broker Credentials (Finvasia Shoonya)
-# -------------------------------------------------------------
+# Finvasia Shoonya API Credentials (Private Secrets)
 SHOONYA_USER=your_user_id
 SHOONYA_PWD=your_password
 SHOONYA_API_KEY=your_api_key
 SHOONYA_VENDOR_CODE=your_vendor_code
 SHOONYA_TOTP_KEY=your_totp_secret_key
 SHOONYA_IMEI=shoonya_algo_desktop
-
-# -------------------------------------------------------------
-# 3. Strategy & Risk Configuration Overrides
-# -------------------------------------------------------------
-# TRADING_MODE=paper              # paper (paper_trades.db) | live (live_trades.db)
-# ORDER_TYPE=BO                   # BO (Bracket Order) | MIS (Standard Margin)
-# INITIAL_CAPITAL=10000.0         # Baseline capital in ₹
-# MAX_CONCURRENT_POSITIONS=2      # Max active slots
-# LEVERAGE_MIS=5                  # MIS leverage multiplier
-# SWING_SL_BUFFER_PCT=0.0005      # 0.05% anti-wick buffer above 3-bar swing high
-# MIN_SL_BUFFER_PCT=0.0020        # 0.20% minimum risk floor above entry price
 ```
+> [!NOTE]
+> All strategy parameters, risk rules, and portfolio math are centrally defined as typed Python constants in [`core/config.py`](core/config.py). Your `.env` file is exclusively reserved for confidential secrets.
 
 ---
 

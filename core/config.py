@@ -16,38 +16,36 @@ load_dotenv()
 
 @dataclass(frozen=True)
 class TradingConfig:
-    # Active Broker Selection (shoonya, zerodha, dhan, groww, zero)
+    # Active Broker Selection (from env or default)
     ACTIVE_BROKER: str = os.getenv("ACTIVE_BROKER", "shoonya").lower()
 
-    # Portfolio Capital & Allocation
-    INITIAL_CAPITAL: float = float(os.getenv("INITIAL_CAPITAL", "10000.0"))
-    MAX_CONCURRENT_POSITIONS: int = int(os.getenv("MAX_CONCURRENT_POSITIONS", "2"))
-    LEVERAGE_MIS: int = int(os.getenv("LEVERAGE_MIS", "5"))
+    # Portfolio Capital & Allocation Defaults
+    INITIAL_CAPITAL: float = 10000.0
+    MAX_CONCURRENT_POSITIONS: int = 2
+    LEVERAGE_MIS: int = 5
 
     # Market Data & Timeframe Settings
-    TIMEFRAME: str = os.getenv("TIMEFRAME", "15m")
-    BACKTEST_PERIOD: str = os.getenv("BACKTEST_PERIOD", "60d")
+    TIMEFRAME: str = "15m"
+    BACKTEST_PERIOD: str = "60d"
 
     # Strategy Entry Timing Windows (IST)
-    ENTRY_START_HOUR: int = int(os.getenv("ENTRY_START_HOUR", "10"))
-    ENTRY_END_HOUR: int = int(os.getenv("ENTRY_END_HOUR", "13"))
-    ENTRY_END_MINUTE: int = int(os.getenv("ENTRY_END_MINUTE", "30"))
+    ENTRY_START_HOUR: int = 10
+    ENTRY_END_HOUR: int = 13
+    ENTRY_END_MINUTE: int = 30
 
     # Intraday Auto-Squareoff Timing (IST)
-    SQUAREOFF_HOUR: int = int(os.getenv("SQUAREOFF_HOUR", "15"))
-    SQUAREOFF_MINUTE: int = int(os.getenv("SQUAREOFF_MINUTE", "0"))
+    SQUAREOFF_HOUR: int = 15
+    SQUAREOFF_MINUTE: int = 0
 
-    # Live Trading & Database Execution Mode (paper = Virtual Sandbox, live = Real Money OMS)
-    TRADING_MODE: str = os.getenv("TRADING_MODE", "paper").lower()
+    # Execution Mode Defaults
+    TRADING_MODE: str = "paper"
+    ORDER_TYPE: str = "BO"
 
-    # Order Execution Mode (BO = Bracket Order with exchange protection, MIS = Standard Margin)
-    ORDER_TYPE: str = os.getenv("ORDER_TYPE", "BO").upper()
-
-    # Risk Management Settings
-    MIN_SL_BUFFER_PCT: float = float(os.getenv("MIN_SL_BUFFER_PCT", "0.002"))      # 0.2% min SL buffer above entry
-    SWING_SL_BUFFER_PCT: float = float(os.getenv("SWING_SL_BUFFER_PCT", "0.0005"))  # 0.05% anti-wick buffer above swing high
-    SWING_HIGH_BARS: int = int(os.getenv("SWING_HIGH_BARS", "3"))                 # 3-bar swing high lookback
-    RISK_REWARD_RATIO: float = float(os.getenv("RISK_REWARD_RATIO", "2.0"))       # 1:2 R:R target
+    # Risk Management Rules
+    MIN_SL_BUFFER_PCT: float = 0.0020      # 0.2% min SL buffer above entry
+    SWING_SL_BUFFER_PCT: float = 0.0005    # 0.05% anti-wick buffer above swing high
+    SWING_HIGH_BARS: int = 3               # 3-bar swing high lookback
+    RISK_REWARD_RATIO: float = 2.0         # 1:2 R:R target
 
     # Computed Properties
     @property
