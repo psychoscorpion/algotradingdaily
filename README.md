@@ -133,7 +133,7 @@ SHOONYA_TOTP_KEY=your_totp_secret_key
 SHOONYA_IMEI=shoonya_algo_desktop
 ```
 > [!NOTE]
-> All strategy parameters, risk rules, and portfolio math are centrally defined as typed Python constants in [`core/config.py`](core/config.py). Your `.env` file is exclusively reserved for confidential secrets.
+> All strategy parameters, risk rules, and portfolio math are centrally defined as typed Python constants in [`config.py`](config.py). Your `.env` file is exclusively reserved for confidential secrets.
 
 ---
 

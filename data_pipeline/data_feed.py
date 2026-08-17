@@ -9,11 +9,19 @@ Unified data gateway for the project:
 
 import io
 import os
+import sys
 import requests
 # pyrefly: ignore [missing-import]
 import yfinance as yf
 import pandas as pd
 from typing import List, Optional
+
+if hasattr(sys.stdout, 'reconfigure'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
 
 CACHE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "market_data"))
 

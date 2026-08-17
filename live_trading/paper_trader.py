@@ -18,7 +18,11 @@ import pandas as pd
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 if hasattr(sys.stdout, 'reconfigure'):
-    sys.stdout.reconfigure(encoding='utf-8')
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
 
 from config import CONFIG, TradingConfig
 from live_trading.base_engine import BaseTradingEngine
@@ -284,7 +288,11 @@ class PaperTradingEngine(BaseTradingEngine):
         if not self.active_positions:
             return
 
-        print(f"\n[{datetime.datetime.now().strftime('%H:%M:%S')}] ⏱️ MANDATORY 3:00 PM AUTO-SQUAREOFF ENFORCED.")
+        try:
+            print(f"\n[{datetime.datetime.now().strftime('%H:%M:%S')}] ⏱️ MANDATORY 3:00 PM AUTO-SQUAREOFF ENFORCED.")
+        except Exception:
+            print(f"\n[{datetime.datetime.now().strftime('%H:%M:%S')}] [MANDATORY 3:00 PM AUTO-SQUAREOFF ENFORCED.]")
+
         for symbol in list(self.active_positions.keys()):
             ticker = f"{symbol.replace('-EQ', '')}.NS"
             try:
@@ -293,7 +301,14 @@ class PaperTradingEngine(BaseTradingEngine):
             except Exception:
                 ltp = self.active_positions[symbol]['entry_price']
 
-            self._close_position(symbol, exit_price=ltp, result='3PM EXIT ⏱️')
+            try:
+                self._close_position(symbol, exit_price=ltp, result='3PM EXIT ⏱️')
+            except Exception as e:
+                # Fallback: ensure DB record closes even if terminal print encoding fails
+                try:
+                    self._close_position(symbol, exit_price=ltp, result='3PM EXIT')
+                except Exception:
+                    pass
 
     def run_live_loop(self) -> None:
         """
