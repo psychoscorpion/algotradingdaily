@@ -53,8 +53,9 @@ An automated intraday trading execution engine and portfolio simulator built in 
 
 ```text
 shoonya_algo/
-├── core/                  # Pure math, indicators, config & regulatory fee calculators
-│   ├── config.py          # Centralized TradingConfig dataclass & .env overrides
+├── config.py              # Centralized TradingConfig dataclass & parameters
+│
+├── core/                  # Pure math, indicators & regulatory fee calculators
 │   ├── trade_db.py        # Isolated SQLite trade journals (WAL mode & concurrency hardened)
 │   ├── indicators.py      # Stoch RSI, ADX, VWAP, Relative Weakness formulas
 │   └── charges.py         # Universal Indian taxes & multi-broker fee engine

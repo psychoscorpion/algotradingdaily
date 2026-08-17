@@ -20,7 +20,7 @@ from NorenRestApiPy.NorenApi import NorenApi
 # Ensure workspace root is in sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from core.config import CONFIG, TradingConfig
+from config import CONFIG, TradingConfig
 from data_pipeline import get_nifty50_symbols
 
 

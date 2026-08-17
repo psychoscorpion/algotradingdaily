@@ -1,9 +1,8 @@
 """
-Core Trading System Configuration.
+System-Wide Configuration & Quantitative Parameters.
 
-Provides centralized, typed configuration parameters across backtesting,
-data pipelines, strategy evaluation, and live trading execution.
-Values can be overridden seamlessly via environment variables in .env.
+Centralized source of truth across all modules (data pipelines,
+strategies, backtesting simulations, and live execution daemons).
 """
 
 import os

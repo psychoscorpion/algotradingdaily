@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 
-from core.config import CONFIG, TradingConfig
+from config import CONFIG, TradingConfig
 from data_pipeline import get_nifty50_symbols, fetch_nifty_benchmark
 from strategies.vwap_stoch_breakdown import STRATEGY_NAME, STRATEGY_VERSION
 from backtesting.portfolio_sim import scan_universe_signals

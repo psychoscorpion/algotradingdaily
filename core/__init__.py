@@ -1,5 +1,5 @@
 """
-Core Package: Pure mathematical indicators, statutory fee calculators, configuration, and trade models.
+Core Package: Pure mathematical indicators, statutory fee calculators, and trade models.
 """
 
 from .charges import (
@@ -13,7 +13,6 @@ from .indicators import (
     add_vwap,
     add_relative_weakness,
 )
-from .config import TradingConfig, CONFIG
 from .trade_db import (
     init_db,
     save_active_position,

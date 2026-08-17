@@ -19,7 +19,7 @@ Strategy Rules:
 
 import pandas as pd
 from typing import Optional, Dict, Any
-from core.config import CONFIG, TradingConfig
+from config import CONFIG, TradingConfig
 from core.indicators import add_stoch_rsi, add_adx, add_vwap, add_relative_weakness
 
 STRATEGY_NAME = "VWAP-Stoch Breakdown"

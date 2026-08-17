@@ -13,7 +13,7 @@ import sys
 # Ensure workspace root is in sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from core.config import CONFIG, TradingConfig
+from config import CONFIG, TradingConfig
 
 
 class TestStrategyParity(unittest.TestCase):
