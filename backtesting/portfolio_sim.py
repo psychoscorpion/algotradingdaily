@@ -14,6 +14,7 @@ import sys
 import argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+from typing import Optional, Tuple
 import numpy as np
 import pandas as pd
 
@@ -151,7 +152,13 @@ def simulate_portfolio_execution(signals_df: pd.DataFrame, config: TradingConfig
     return tdf, capital, total_charges_paid, trade_exposure, per_trade_margin
 
 
-def print_simulation_report(tdf: pd.DataFrame, ending_capital: float, total_charges: float, config: TradingConfig = CONFIG):
+def print_simulation_report(
+    tdf: pd.DataFrame,
+    ending_capital: float,
+    total_charges: float,
+    config: TradingConfig = CONFIG,
+    dataset_date_range: Optional[tuple] = None
+):
     """Prints a formatted summary dashboard of the portfolio simulation performance."""
     if tdf.empty:
         print("\n⚠️ No trades were executed during this simulation period.")
@@ -167,9 +174,12 @@ def print_simulation_report(tdf: pd.DataFrame, ending_capital: float, total_char
     gross_profit = net_profit + total_charges
     gross_return_pct = (gross_profit / initial_capital) * 100
 
-    start_date = pd.to_datetime(tdf['Entry Time']).min().strftime('%Y-%m-%d')
-    end_date = pd.to_datetime(tdf['Exit Time']).max().strftime('%Y-%m-%d')
-    trading_days = len(pd.to_datetime(tdf['Entry Time']).dt.date.unique())
+    if dataset_date_range and dataset_date_range[0] and dataset_date_range[1]:
+        start_date, end_date, trading_days = dataset_date_range
+    else:
+        start_date = pd.to_datetime(tdf['Entry Time']).min().strftime('%Y-%m-%d')
+        end_date = pd.to_datetime(tdf['Exit Time']).max().strftime('%Y-%m-%d')
+        trading_days = len(pd.to_datetime(tdf['Entry Time']).dt.date.unique())
 
     # Quantitative Risk & Performance Analytics
     gross_gains = tdf[tdf['Gross PnL (₹)'] > 0]['Gross PnL (₹)'].sum()
@@ -263,11 +273,20 @@ def run_portfolio_simulation(config: TradingConfig = CONFIG, refresh: bool = Fal
         config=config
     )
 
+    dataset_date_range = None
+    if nifty_pct_map is not None and not nifty_pct_map.empty:
+        idx_dt = pd.to_datetime(nifty_pct_map.index)
+        bench_start = idx_dt.min().strftime('%Y-%m-%d')
+        bench_end = idx_dt.max().strftime('%Y-%m-%d')
+        bench_days = len(set(idx_dt.date))
+        dataset_date_range = (bench_start, bench_end, bench_days)
+
     print_simulation_report(
         tdf=tdf,
         ending_capital=ending_capital,
         total_charges=total_charges,
-        config=config
+        config=config,
+        dataset_date_range=dataset_date_range
     )
 
 

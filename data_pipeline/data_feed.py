@@ -61,18 +61,37 @@ def _archive_path(symbol: str, interval: str) -> str:
     return os.path.join(CACHE_DIR, f"{clean}_{interval}.csv")
 
 
-def _is_cache_fresh(df: pd.DataFrame, max_stale_days: int = 2) -> bool:
+def _is_cache_fresh(df: pd.DataFrame) -> bool:
     """
-    A local archive is considered fresh if its last candle is within
-    max_stale_days calendar days of today (weekend-safe).
+    A local archive is considered fresh if it contains candles up to the
+    most recent completed NSE trading session (accounting for weekends and market hours).
     """
     if df is None or df.empty:
         return False
     last_ts = df.index[-1]
     if getattr(last_ts, "tzinfo", None) is not None:
         last_ts = last_ts.tz_localize(None)
-    gap_days = (pd.Timestamp.now().normalize() - pd.Timestamp(last_ts).normalize()).days
-    return 0 <= gap_days <= max_stale_days
+
+    now = pd.Timestamp.now()
+    today_date = now.date()
+    last_date = pd.Timestamp(last_ts).date()
+
+    # If today is a weekday and current time is past 15:30 IST (session finished)
+    if now.weekday() < 5 and (now.hour > 15 or (now.hour == 15 and now.minute >= 30)):
+        return last_date == today_date
+
+    # If today is Saturday (5) or Sunday (6), cache must have Friday's date
+    if now.weekday() == 5:
+        return last_date == (now - pd.Timedelta(days=1)).date()
+    elif now.weekday() == 6:
+        return last_date == (now - pd.Timedelta(days=2)).date()
+
+    # If today is Monday before market close, cache must have Friday's date
+    if now.weekday() == 0:
+        return last_date == (now - pd.Timedelta(days=3)).date()
+
+    # Mid-week before market close: cache must have yesterday's date
+    return last_date == (now - pd.Timedelta(days=1)).date()
 
 
 def load_candle_data(
