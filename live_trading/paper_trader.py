@@ -214,22 +214,11 @@ class PaperTradingEngine(BaseTradingEngine):
     def scan_and_execute_signals(self, nifty_pct_map: pd.Series) -> None:
         """
         Scans the Nifty 50 universe at 15m candle close and triggers virtual entries if open slots exist.
-        Prints a real-time condition funnel summary across all constituents.
         """
         if len(self.active_positions) >= self.config.MAX_CONCURRENT_POSITIONS:
             return
 
         symbols = get_nifty50_symbols()
-        total_symbols = len(symbols)
-        stats = {
-            'scanned': 0,
-            'rel_weakness': 0,
-            'vwap_below': 0,
-            'adx_trend': 0,
-            'stoch_cross': 0,
-            'signals': 0
-        }
-
         for ticker in symbols:
             if len(self.active_positions) >= self.config.MAX_CONCURRENT_POSITIONS:
                 break
@@ -247,19 +236,11 @@ class PaperTradingEngine(BaseTradingEngine):
                 if df is None or len(df) == 0:
                     continue
 
-                stats['scanned'] += 1
                 last_idx = len(df) - 1
                 last_row = df.iloc[last_idx]
 
-                # Tally condition telemetry
-                if last_row.get('Rel_Weakness', False): stats['rel_weakness'] += 1
-                if last_row.get('Close', 0.0) < last_row.get('VWAP', 0.0): stats['vwap_below'] += 1
-                if last_row.get('ADX', 0.0) > 25: stats['adx_trend'] += 1
-                if last_row.get('Stoch_K_prev', 0.0) >= 80 and last_row.get('Stoch_K', 0.0) < 80: stats['stoch_cross'] += 1
-
                 # Check if breakdown signal fired on the latest closed candle
                 if last_row.get('Signal', False):
-                    stats['signals'] += 1
                     entry_price = float(last_row['Close'])
                     swing_high = float(df.iloc[last_idx - self.config.SWING_HIGH_BARS : last_idx]['High'].max())
                     sl_price = max(
@@ -277,15 +258,6 @@ class PaperTradingEngine(BaseTradingEngine):
                     )
             except Exception:
                 continue
-
-        # Print clean condition funnel table after every 15m scan
-        print(f"\n[{datetime.datetime.now().strftime('%H:%M:%S')}] 📊 15m Scan Funnel ({stats['scanned']}/{total_symbols} constituents evaluated):")
-        print(f"    • Relative Weakness vs NIFTY : {stats['rel_weakness']:>2}/{stats['scanned']} stocks")
-        print(f"    • Price < Intraday VWAP       : {stats['vwap_below']:>2}/{stats['scanned']} stocks")
-        print(f"    • Strong ADX Trend (ADX > 25) : {stats['adx_trend']:>2}/{stats['scanned']} stocks")
-        print(f"    • Stochastic RSI Breakdown    : {stats['stoch_cross']:>2}/{stats['scanned']} stocks")
-        print(f"    ---------------------------------------------")
-        print(f"    ⭐ Qualified Entries Fired    : {stats['signals']} trade(s) | Open Slots: {len(self.active_positions)}/{self.config.MAX_CONCURRENT_POSITIONS}\n")
 
     def monitor_active_positions(self) -> None:
         """Checks active positions against latest prices and handles SL / TP / Trailing."""
