@@ -17,7 +17,8 @@ from live_trading.paper_trader import PaperTradingEngine
 
 class TestLivePositionGuardian(unittest.TestCase):
     def setUp(self):
-        self.config = TradingConfig()
+        # Configure test config with zero alert channels so unit tests do not spam real Telegram
+        self.config = TradingConfig(ALERT_CHANNELS=())
         self.engine = PaperTradingEngine(config=self.config)
         self.engine.active_positions.clear()
 

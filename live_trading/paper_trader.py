@@ -76,7 +76,7 @@ class PaperTradingEngine(BaseTradingEngine):
             mode="paper"
         )
         print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] 📝 [PAPER ENTRY] Short {qty}x {symbol} @ ₹{entry_price:.2f} | SL: ₹{sl_price:.2f} | TP: ₹{tp_price:.2f}")
-        notify_trade_entry(symbol=symbol, price=entry_price, sl=sl_price, tp=tp_price, qty=qty, mode="paper")
+        notify_trade_entry(symbol=symbol, price=entry_price, sl=sl_price, tp=tp_price, qty=qty, mode="paper", config=self.config)
 
     def update_position(self, symbol: str, current_ltp: float, high: float, low: float, now: Optional[datetime.datetime] = None) -> Optional[Dict[str, Any]]:
         """Updates virtual position tracking against live market ticks."""
@@ -107,6 +107,7 @@ class PaperTradingEngine(BaseTradingEngine):
             pos['trailed'] = True
             update_trailing_sl(symbol, new_sl_price=entry_p, mode="paper")
             print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] 🛡️ [PAPER TRAIL] {symbol} reached +1R profit! SL moved to Breakeven (₹{entry_p:.2f}).")
+            notify_trailing_sl(symbol=symbol, be_price=entry_p, mode="paper", config=self.config)
 
         # 4. Mandatory Squareoff
         if self.is_squareoff_time(now=now):
@@ -158,7 +159,7 @@ class PaperTradingEngine(BaseTradingEngine):
         }
         self.paper_trades.append(trade_record)
         print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] 🏁 [PAPER EXIT] {symbol} @ ₹{exit_price:.2f} | Net PnL: ₹{net_pnl:+.2f} ({pnl_pct:+.2f}%) | {result}")
-        notify_trade_exit(symbol=symbol, price=exit_price, net_pnl=net_pnl, pnl_pct=pnl_pct, reason=result, mode="paper")
+        notify_trade_exit(symbol=symbol, price=exit_price, net_pnl=net_pnl, pnl_pct=pnl_pct, reason=result, mode="paper", config=self.config)
         return trade_record
 
     def generate_eod_report(self) -> None:
@@ -230,7 +231,7 @@ class PaperTradingEngine(BaseTradingEngine):
             f"Ending Balance: ₹{ending_balance:,.2f}\n\n"
             f"Trade Log:\n" + "\n".join(trade_lines)
         )
-        notify_eod_summary(report_text=eod_msg, mode="paper")
+        notify_eod_summary(report_text=eod_msg, mode="paper", config=self.config)
 
 
     def scan_and_execute_signals(self, nifty_pct_map: pd.Series) -> None:
