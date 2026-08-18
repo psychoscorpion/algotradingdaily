@@ -264,14 +264,14 @@ class PaperTradingEngine(BaseTradingEngine):
 
                 # Check if breakdown signal fired on the latest closed candle
                 if last_row.get('Signal', False):
-                    entry_price = float(last_row['Close'])
+                    entry_price = round(float(last_row['Close']), 2)
                     swing_high = float(df.iloc[last_idx - self.config.SWING_HIGH_BARS : last_idx]['High'].max())
-                    sl_price = max(
+                    sl_price = round(max(
                         swing_high * (1.0 + self.config.SWING_SL_BUFFER_PCT),
                         entry_price * (1.0 + self.config.MIN_SL_BUFFER_PCT)
-                    )
-                    risk = sl_price - entry_price
-                    tp_price = entry_price - (2.0 * risk)
+                    ), 2)
+                    risk = round(sl_price - entry_price, 2)
+                    tp_price = round(entry_price - (2.0 * risk), 2)
 
                     self.execute_virtual_entry(
                         symbol=sym_key,

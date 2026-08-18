@@ -134,7 +134,7 @@ def save_active_position(
     order_type: str = "BO",
     mode: str = "paper"
 ) -> None:
-    """Persists a newly opened position in active_positions table."""
+    """Persists a newly opened position in active_positions table with 2-decimal precision."""
     init_db(mode)
     now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
@@ -146,7 +146,7 @@ def save_active_position(
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE', ?)
         """, (
             symbol, order_type, str(entry_order_id or ""), str(sl_order_id or ""),
-            int(qty), float(entry_p), float(sl_p), float(sl_p), float(tp_p), now_str
+            int(qty), round(float(entry_p), 2), round(float(sl_p), 2), round(float(sl_p), 2), round(float(tp_p), 2), now_str
         ))
         conn.commit()
 
@@ -160,7 +160,7 @@ def update_trailing_sl(symbol: str, new_sl_price: float, mode: str = "paper") ->
             UPDATE active_positions 
             SET current_sl = ?, status = 'TRAILING'
             WHERE symbol = ?
-        """, (float(new_sl_price), symbol))
+        """, (round(float(new_sl_price), 2), symbol))
         conn.commit()
         return cursor.rowcount > 0
 
@@ -177,7 +177,7 @@ def close_and_archive_position(
 ) -> bool:
     """
     Atomically closes an active position and inserts the completed trade
-    into the trade_history journal.
+    into the trade_history journal with 2-decimal precision.
     """
     init_db(mode)
     now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -204,13 +204,13 @@ def close_and_archive_position(
             pos_dict.get("order_type", "BO"),
             pos_dict.get("entry_time", now_str),
             exit_time,
-            float(pos_dict.get("entry_price", 0.0)),
-            float(exit_price),
+            round(float(pos_dict.get("entry_price", 0.0)), 2),
+            round(float(exit_price), 2),
             int(pos_dict.get("quantity", 1)),
             result,
-            float(gross_pnl),
-            float(taxes_fees),
-            float(net_pnl),
+            round(float(gross_pnl), 2),
+            round(float(taxes_fees), 2),
+            round(float(net_pnl), 2),
             now_str
         ))
         

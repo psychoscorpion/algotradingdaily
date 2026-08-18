@@ -85,7 +85,8 @@ shoonya_algo/
 │   ├── test_trade_db.py   # SQLite CRUD, isolation & zero-pollution verification
 │   ├── test_charges.py    # Multi-broker fee engine & statutory tax verification
 │   ├── test_strategy_parity.py # Exact numerical parity between backtesting and live execution
-│   └── test_alerts.py     # Multi-channel notification dispatch & failure isolation
+│   ├── test_alerts.py     # Multi-channel notification dispatch & failure isolation
+│   └── test_live_monitor.py # High-frequency guardian & precise 3PM squareoff
 │
 ├── market_data/           # Local candle cache CSVs (git-ignored)
 ├── database/              # SQLite trade journals (git-ignored)
@@ -187,4 +188,5 @@ python -m unittest tests/test_charges.py
 python -m unittest tests/test_trade_db.py
 python -m unittest tests/test_strategy_parity.py
 python -m unittest tests/test_alerts.py
+python -m unittest tests/test_live_monitor.py
 ```
