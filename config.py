@@ -41,6 +41,9 @@ class TradingConfig:
     TRADING_MODE: str = "paper"  # Execution sandbox: "paper" (paper_trades.db) | "live" (live_trades.db)
     ORDER_TYPE: str = "BO"       # Order type: "BO" (Bracket Order with exchange SL) | "MIS" (Margin Intraday Square-off)
 
+    # Notification & Alert Channels: list of enabled mediums (e.g. () for none, ("telegram",), ("telegram", "discord", "email"))
+    ALERT_CHANNELS: tuple = ("telegram",)
+
     # Risk Management Rules
     MIN_SL_BUFFER_PCT: float = 0.0020      # 0.2% min SL buffer above entry
     SWING_SL_BUFFER_PCT: float = 0.0005    # 0.05% anti-wick buffer above swing high

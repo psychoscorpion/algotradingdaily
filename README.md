@@ -76,10 +76,16 @@ shoonya_algo/
 │   ├── paper_trader.py    # Risk-free virtual paper trading
 │   └── live_trader.py     # Real-money Shoonya OMS order placement
 │
+├── alerts/                # Multi-channel notification framework (Telegram, Webhooks)
+│   ├── __init__.py        # Clean public export facade
+│   ├── base.py            # BaseAlertChannel interface & dynamic channel dispatcher
+│   └── telegram.py        # Telegram bot push notifications
+│
 ├── tests/                 # Automated test suites
 │   ├── test_trade_db.py   # SQLite CRUD, isolation & zero-pollution verification
 │   ├── test_charges.py    # Multi-broker fee engine & statutory tax verification
-│   └── test_strategy_parity.py # Exact numerical parity between backtesting and live execution
+│   ├── test_strategy_parity.py # Exact numerical parity between backtesting and live execution
+│   └── test_alerts.py     # Multi-channel notification dispatch & failure isolation
 │
 ├── market_data/           # Local candle cache CSVs (git-ignored)
 ├── database/              # SQLite trade journals (git-ignored)
@@ -170,8 +176,9 @@ python -m live_trading.live_trader
 # Run all unit tests
 python -m unittest discover tests
 
-# Or run individual test modules:
+# Run individual test modules:
 python -m unittest tests/test_charges.py
 python -m unittest tests/test_trade_db.py
 python -m unittest tests/test_strategy_parity.py
+python -m unittest tests/test_alerts.py
 ```

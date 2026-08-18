@@ -29,6 +29,7 @@ from live_trading.base_engine import BaseTradingEngine
 from strategies.vwap_stoch_breakdown import STRATEGY_NAME, evaluate_signals
 from data_pipeline import get_nifty50_symbols, fetch_nifty_benchmark, fetch_stock_candles
 from core.trade_db import save_active_position, update_trailing_sl, close_and_archive_position, get_active_positions
+from alerts import notify_trade_entry, notify_trailing_sl, notify_trade_exit, notify_eod_summary
 
 
 class PaperTradingEngine(BaseTradingEngine):
