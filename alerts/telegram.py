@@ -4,6 +4,7 @@ Telegram Notification Channel Implementation.
 
 import os
 import requests
+import datetime
 from typing import Optional
 from alerts.base import BaseAlertChannel
 
@@ -27,13 +28,42 @@ class TelegramAlertChannel(BaseAlertChannel):
         payload = {
             "chat_id": self.chat_id,
             "text": text,
-            "parse_mode": "Markdown",
+            "parse_mode": "HTML",
             "disable_web_page_preview": True
         }
+        
+        # Format for HTML delivery (HTML parse mode avoids Telegram markdown underscore / dash collision errors)
+        html_text = (
+            text.replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("*", "<b>", 1)
+            .replace("*", "</b>", 1)
+            .replace("`", "<code>", 1)
+            .replace("`", "</code>", 1)
+        )
+        payload["text"] = text
+
         try:
-            res = requests.post(url, json=payload, timeout=5)
-            return res.status_code == 200
-        except Exception:
+            # First try sending as Markdown
+            payload["parse_mode"] = "Markdown"
+            res = requests.post(url, json=payload, timeout=8)
+            
+            if res.status_code == 200:
+                print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] 📱 [TELEGRAM] Alert delivered successfully to {self.chat_id}.")
+                return True
+            else:
+                # Fallback: send as raw plain text if Telegram rejected markdown tags
+                payload.pop("parse_mode", None)
+                fallback_res = requests.post(url, json=payload, timeout=8)
+                if fallback_res.status_code == 200:
+                    print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] 📱 [TELEGRAM] Alert delivered via plain-text fallback.")
+                    return True
+                else:
+                    print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] ⚠️ [TELEGRAM ERROR] Status {fallback_res.status_code}: {fallback_res.text}")
+                    return False
+        except Exception as e:
+            print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] ⚠️ [TELEGRAM EXCEPTION] {e}")
             return False
 
     def send_trade_entry(self, symbol: str, price: float, sl: float, tp: float, qty: int, mode: str = "paper") -> bool:
@@ -66,7 +96,7 @@ class TelegramAlertChannel(BaseAlertChannel):
 
     def send_eod_summary(self, report_text: str, mode: str = "paper") -> bool:
         msg = (
-            f"📊 *[{mode.upper()} EOD REPORT]*\n"
-            f"```\n{report_text}\n```"
+            f"📊 *[{mode.upper()} EOD REPORT]*\n\n"
+            f"{report_text}"
         )
         return self.send_message(msg)

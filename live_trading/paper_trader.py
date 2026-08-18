@@ -76,6 +76,7 @@ class PaperTradingEngine(BaseTradingEngine):
             mode="paper"
         )
         print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] 📝 [PAPER ENTRY] Short {qty}x {symbol} @ ₹{entry_price:.2f} | SL: ₹{sl_price:.2f} | TP: ₹{tp_price:.2f}")
+        notify_trade_entry(symbol=symbol, price=entry_price, sl=sl_price, tp=tp_price, qty=qty, mode="paper")
 
     def update_position(self, symbol: str, current_ltp: float, high: float, low: float) -> Optional[Dict[str, Any]]:
         """Updates virtual position tracking against live market ticks."""
@@ -157,6 +158,7 @@ class PaperTradingEngine(BaseTradingEngine):
         }
         self.paper_trades.append(trade_record)
         print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] 🏁 [PAPER EXIT] {symbol} @ ₹{exit_price:.2f} | Net PnL: ₹{net_pnl:+.2f} ({pnl_pct:+.2f}%) | {result}")
+        notify_trade_exit(symbol=symbol, price=exit_price, net_pnl=net_pnl, pnl_pct=pnl_pct, reason=result, mode="paper")
         return trade_record
 
     def generate_eod_report(self) -> None:
@@ -204,16 +206,31 @@ class PaperTradingEngine(BaseTradingEngine):
         print(f"Ending Balance       : ₹{ending_balance:,.2f} ({'+' if roi_pct >= 0 else ''}{roi_pct:.2f}% Daily ROI)")
         print("=====================================================")
         print("Trade Log:")
+        trade_lines = []
         for idx, t in enumerate(day_trades, 1):
             sym = t.get('symbol', 'UNKNOWN')
             ep = t.get('entry_price', 0.0)
             xp = t.get('exit_price', 0.0)
             res = t.get('result', '')
             npnl = t.get('net_pnl', 0.0)
-            print(f"{idx}. {sym:<14}: SHORT @ ₹{ep:,.2f} -> {res} @ ₹{xp:,.2f} | Net: {'+' if npnl >= 0 else '-'}₹{abs(npnl):,.2f}")
+            line = f"{idx}. {sym:<14}: SHORT @ ₹{ep:,.2f} -> {res} @ ₹{xp:,.2f} | Net: {'+' if npnl >= 0 else '-'}₹{abs(npnl):,.2f}"
+            trade_lines.append(line)
+            print(line)
         print("=====================================================")
         print("STATUS: 🏁 All positions squared off. Session closed.")
         print("=====================================================\n")
+
+        # Broadcast summary to Telegram & configured alert channels
+        eod_msg = (
+            f"Date: {today_date}\n"
+            f"Trades: {total_trades} ({win_count}W / {loss_count}L) | Win Rate: {win_rate:.1f}%\n"
+            f"Gross PnL: {'+' if gross_pnl >= 0 else '-'}₹{abs(gross_pnl):,.2f}\n"
+            f"Taxes/Fees: -₹{taxes_fees:,.2f}\n"
+            f"Net PnL: {'+' if net_pnl >= 0 else '-'}₹{abs(net_pnl):,.2f} ({roi_pct:+.2f}% ROI)\n"
+            f"Ending Balance: ₹{ending_balance:,.2f}\n\n"
+            f"Trade Log:\n" + "\n".join(trade_lines)
+        )
+        notify_eod_summary(report_text=eod_msg, mode="paper")
 
 
     def scan_and_execute_signals(self, nifty_pct_map: pd.Series) -> None:
