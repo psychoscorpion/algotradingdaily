@@ -4,4 +4,6 @@ requests==2.34.2
 yfinance==1.6.0
 python-dotenv==1.2.2
 pyotp==2.10.0
+websocket-client==1.9.0
+websockets==17.0.1
 NorenRestApiPy==0.0.22
