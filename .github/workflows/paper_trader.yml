@@ -29,6 +29,20 @@ jobs:
     steps:
       - name: 📥 Checkout Repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🔄 Auto-Sync Latest Code from Upstream Main
+        run: |
+          if [ "${{ github.repository }}" != "vaibhavreddys/algotradingdaily" ]; then
+            echo "⚡ Checking for latest upstream updates from vaibhavreddys/algotradingdaily:main..."
+            git remote add upstream https://github.com/vaibhavreddys/algotradingdaily.git 2>/dev/null || true
+            git fetch upstream main
+            git merge upstream/main --ff-only 2>/dev/null || git rebase upstream/main 2>/dev/null || true
+            echo "✅ Runner synced to latest upstream commit: $(git rev-parse --short HEAD)"
+          else
+            echo "ℹ️ Running on upstream origin repository."
+          fi
 
       - name: 🐍 Set up Python 3.12
         uses: actions/setup-python@v5
