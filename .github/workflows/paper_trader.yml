@@ -32,10 +32,9 @@ jobs:
           pip install -r requirements.txt
 
       - name: 💾 Download Previous SQLite Trade Database
-        uses: dawidd6/action-download-artifact@v6
+        uses: actions/download-artifact@v4
         continue-on-error: true
         with:
-          workflow: paper_trader.yml
           name: paper-trade-database
           path: database/
 
