@@ -10,6 +10,7 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
   TZ: 'Asia/Kolkata'
+  PYTHONUNBUFFERED: '1'
 
 jobs:
   run-trading-bot:
@@ -39,6 +40,7 @@ jobs:
       - name: 🚀 Run Paper Trading Engine
         env:
           TZ: 'Asia/Kolkata'
+          PYTHONUNBUFFERED: '1'
           SHOONYA_USER: ${{ secrets.SHOONYA_USER }}
           SHOONYA_PWD: ${{ secrets.SHOONYA_PWD }}
           SHOONYA_API_KEY: ${{ secrets.SHOONYA_API_KEY }}
@@ -48,7 +50,7 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          python -m live_trading.paper_trader
+          python -u -m live_trading.paper_trader
 
       - name: 📤 Persist Trade Database Artifact
         if: always()
