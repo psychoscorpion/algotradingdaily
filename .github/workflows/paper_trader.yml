@@ -8,6 +8,7 @@ on:
 
 env:
   ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+  TZ: 'Asia/Kolkata'
 
 jobs:
   run-trading-bot:
@@ -36,6 +37,7 @@ jobs:
 
       - name: 🚀 Run Paper Trading Engine
         env:
+          TZ: 'Asia/Kolkata'
           SHOONYA_USER: ${{ secrets.SHOONYA_USER }}
           SHOONYA_PWD: ${{ secrets.SHOONYA_PWD }}
           SHOONYA_API_KEY: ${{ secrets.SHOONYA_API_KEY }}
@@ -50,7 +52,9 @@ jobs:
       - name: 📤 Persist Trade Database Artifact
         if: always()
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: paper-trade-database
           path: database/paper_trades.db
           retention-days: 30
+          if-no-files-found: ignore
