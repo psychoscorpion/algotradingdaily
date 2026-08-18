@@ -6,6 +6,9 @@ on:
     - cron: '40 3 * * 1-5'
   workflow_dispatch: # Allows manual trigger anytime from GitHub UI or mobile browser
 
+env:
+  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+
 jobs:
   run-trading-bot:
     name: Execute Trading Strategy
@@ -30,13 +33,6 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-
-      - name: 💾 Download Previous SQLite Trade Database
-        uses: actions/download-artifact@v4
-        continue-on-error: true
-        with:
-          name: paper-trade-database
-          path: database/
 
       - name: 🚀 Run Paper Trading Engine
         env:
