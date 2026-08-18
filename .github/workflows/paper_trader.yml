@@ -18,6 +18,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 420 # 7-hour safety timeout
 
+    # Explicit permissions to allow GitHub Actions to manage Release assets on developer forks
+    permissions:
+      contents: write
+
     # Guard Condition: Skips scheduled cron on the main shared repo to avoid unintended runs without secrets.
     # Runs automatically on developer forks, or whenever triggered manually via workflow_dispatch.
     if: github.repository != 'vaibhavreddys/algotradingdaily' || github.event_name == 'workflow_dispatch'
@@ -37,6 +41,23 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: 📂 Restore Cumulative Trade Journal from Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p database
+          echo "Checking for existing cumulative journal in 'journal-latest' release..."
+          if gh release view journal-latest --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            gh release download journal-latest --pattern "paper_trades.db" --dir database/ --repo "${{ github.repository }}" --clobber || true
+            if [ -f database/paper_trades.db ]; then
+              echo "✅ Successfully restored cumulative trade journal (size: $(wc -c < database/paper_trades.db) bytes)."
+            else
+              echo "ℹ️ No existing journal file found in release. A fresh journal will be created today."
+            fi
+          else
+            echo "ℹ️ Release 'journal-latest' does not exist yet. It will be created at EOD."
+          fi
+
       - name: 🚀 Run Paper Trading Engine
         env:
           TZ: 'Asia/Kolkata'
@@ -52,7 +73,27 @@ jobs:
         run: |
           python -u -m live_trading.paper_trader
 
-      - name: 📤 Persist Trade Database Artifact
+      - name: 🏷️ Persist Cumulative Trade Journal to Release Asset
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -f database/paper_trades.db ]; then
+            echo "Saving cumulative journal ($(wc -c < database/paper_trades.db) bytes) to 'journal-latest' release..."
+            # Create release if it doesn't exist, otherwise upload/clobber asset
+            gh release create journal-latest database/paper_trades.db \
+              --title "Cumulative Trade Journal (Permanent)" \
+              --notes "Permanent cumulative SQLite trade database asset across daily paper trading sessions." \
+              --repo "${{ github.repository }}" 2>/dev/null || \
+            gh release upload journal-latest database/paper_trades.db \
+              --clobber \
+              --repo "${{ github.repository }}"
+            echo "✅ Cumulative journal saved permanently to 'journal-latest' release."
+          else
+            echo "⚠️ No database/paper_trades.db file found to persist."
+          fi
+
+      - name: 📤 Persist Trade Database Artifact (30-Day Backup)
         if: always()
         uses: actions/upload-artifact@v4
         continue-on-error: true
