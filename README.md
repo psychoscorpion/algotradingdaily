@@ -89,6 +89,8 @@ shoonya_algo/
 │
 ├── market_data/           # Local candle cache CSVs (git-ignored)
 ├── database/              # SQLite trade journals (git-ignored)
+├── docs/                  # In-depth architectural & operational setup guides
+│   └── cloud_execution_setup_guide.md # Telegram bot & GitHub Actions fork setup guide
 ├── .env.example           # Public secrets template with placeholder values
 ├── .env                   # Private broker credentials (git-ignored)
 └── README.md
@@ -165,6 +167,10 @@ python -m live_trading.paper_trader
 * **+1R Trailing SL**: Automatically moves stop loss to Breakeven in real-time.
 * **3:00 PM Auto-Squareoff**: Automatically exits open positions at 15:00 IST and saves all records to `database/paper_trades.db`.
 * **Daily EOD Performance Report**: Prints an itemized performance summary table on market close or daemon exit.
+
+### Run Automated 24/7 Cloud Paper Trading (Free GitHub Actions Daemon):
+* Runs automatically in the cloud Monday to Friday (09:10 AM – 15:35 IST) and sends real-time trade signals to your phone via Telegram.
+* See the full step-by-step setup guide in [`docs/cloud_execution_setup_guide.md`](docs/cloud_execution_setup_guide.md).
 
 ### Run Live Real-Money Execution Engine:
 ```bash

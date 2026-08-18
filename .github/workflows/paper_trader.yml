@@ -1,0 +1,61 @@
+name: Daily Paper Trading Execution Daemon
+
+on:
+  schedule:
+    # 03:40 UTC = 09:10 AM IST (Monday to Friday)
+    - cron: '40 3 * * 1-5'
+  workflow_dispatch: # Allows manual trigger anytime from GitHub UI or mobile browser
+
+jobs:
+  run-trading-bot:
+    name: Execute Trading Strategy
+    runs-on: ubuntu-latest
+    timeout-minutes: 420 # 7-hour safety timeout
+
+    # Guard Condition: Skips scheduled cron on the main shared repo to avoid unintended runs without secrets.
+    # Runs automatically on developer forks, or whenever triggered manually via workflow_dispatch.
+    if: github.repository != 'vaibhavreddys/algotradingdaily' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🐍 Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 📦 Install Project Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 💾 Download Previous SQLite Trade Database
+        uses: dawidd6/action-download-artifact@v6
+        continue-on-error: true
+        with:
+          workflow: paper_trader.yml
+          name: paper-trade-database
+          path: database/
+
+      - name: 🚀 Run Paper Trading Engine
+        env:
+          SHOONYA_USER: ${{ secrets.SHOONYA_USER }}
+          SHOONYA_PWD: ${{ secrets.SHOONYA_PWD }}
+          SHOONYA_API_KEY: ${{ secrets.SHOONYA_API_KEY }}
+          SHOONYA_VENDOR_CODE: ${{ secrets.SHOONYA_VENDOR_CODE }}
+          SHOONYA_TOTP_KEY: ${{ secrets.SHOONYA_TOTP_KEY }}
+          SHOONYA_IMEI: ${{ secrets.SHOONYA_IMEI }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          python -m live_trading.paper_trader
+
+      - name: 📤 Persist Trade Database Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: paper-trade-database
+          path: database/paper_trades.db
+          retention-days: 30
