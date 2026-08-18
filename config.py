@@ -44,6 +44,9 @@ class TradingConfig:
     # Notification & Alert Channels: list of enabled mediums (e.g. () for none, ("telegram",), ("telegram", "discord", "email"))
     ALERT_CHANNELS: tuple = ("telegram",)
 
+    # Active Position Guardian High-Frequency Polling (Seconds)
+    POSITION_MONITOR_INTERVAL_SEC: int = 15  # Poll active positions every 15s for instant SL/TP triggers
+
     # Risk Management Rules
     MIN_SL_BUFFER_PCT: float = 0.0020      # 0.2% min SL buffer above entry
     SWING_SL_BUFFER_PCT: float = 0.0005    # 0.05% anti-wick buffer above swing high

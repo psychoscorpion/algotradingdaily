@@ -7,6 +7,7 @@ from .data_feed import (
     fetch_nifty_benchmark,
     fetch_stock_candles,
     load_candle_data,
+    fetch_latest_tick_price,
 )
 
 __all__ = [
@@ -14,4 +15,5 @@ __all__ = [
     "fetch_nifty_benchmark",
     "fetch_stock_candles",
     "load_candle_data",
+    "fetch_latest_tick_price",
 ]

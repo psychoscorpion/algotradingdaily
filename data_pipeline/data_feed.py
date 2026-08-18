@@ -14,7 +14,7 @@ import requests
 # pyrefly: ignore [missing-import]
 import yfinance as yf
 import pandas as pd
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 if hasattr(sys.stdout, 'reconfigure'):
     try:
@@ -178,3 +178,42 @@ def fetch_stock_candles(
         interval=interval,
         force_refresh=force_refresh or (not use_cache),
     )
+
+
+def fetch_latest_tick_price(ticker: str) -> Optional[Dict[str, float]]:
+    """
+    Fetches latest live candle tick (Close, High, Low) for an active position.
+    Uses period='1d' with interval='1m' (or '5m' fallback) without local caching.
+    Returns a dict with {'ltp': float, 'high': float, 'low': float} or None on error.
+    """
+    try:
+        # Try 1m candle first for highest precision
+        raw = yf.download(ticker, period="1d", interval="1m", progress=False)
+        if raw is not None and not raw.empty and len(raw) > 0:
+            if isinstance(raw.columns, pd.MultiIndex):
+                raw.columns = raw.columns.get_level_values(0)
+            latest = raw.iloc[-1]
+            return {
+                'ltp': float(latest['Close']),
+                'high': float(latest['High']),
+                'low': float(latest['Low'])
+            }
+    except Exception:
+        pass
+
+    # Fallback to 5m candle
+    try:
+        raw = yf.download(ticker, period="5d", interval="5m", progress=False)
+        if raw is not None and not raw.empty and len(raw) > 0:
+            if isinstance(raw.columns, pd.MultiIndex):
+                raw.columns = raw.columns.get_level_values(0)
+            latest = raw.iloc[-1]
+            return {
+                'ltp': float(latest['Close']),
+                'high': float(latest['High']),
+                'low': float(latest['Low'])
+            }
+    except Exception:
+        pass
+
+    return None

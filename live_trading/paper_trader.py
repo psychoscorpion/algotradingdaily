@@ -27,7 +27,7 @@ if hasattr(sys.stdout, 'reconfigure'):
 from config import CONFIG, TradingConfig
 from live_trading.base_engine import BaseTradingEngine
 from strategies.vwap_stoch_breakdown import STRATEGY_NAME, evaluate_signals
-from data_pipeline import get_nifty50_symbols, fetch_nifty_benchmark, fetch_stock_candles
+from data_pipeline import get_nifty50_symbols, fetch_nifty_benchmark, fetch_stock_candles, fetch_latest_tick_price
 from core.trade_db import save_active_position, update_trailing_sl, close_and_archive_position, get_active_positions
 from alerts import notify_trade_entry, notify_trailing_sl, notify_trade_exit, notify_eod_summary
 
@@ -78,7 +78,7 @@ class PaperTradingEngine(BaseTradingEngine):
         print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] 📝 [PAPER ENTRY] Short {qty}x {symbol} @ ₹{entry_price:.2f} | SL: ₹{sl_price:.2f} | TP: ₹{tp_price:.2f}")
         notify_trade_entry(symbol=symbol, price=entry_price, sl=sl_price, tp=tp_price, qty=qty, mode="paper")
 
-    def update_position(self, symbol: str, current_ltp: float, high: float, low: float) -> Optional[Dict[str, Any]]:
+    def update_position(self, symbol: str, current_ltp: float, high: float, low: float, now: Optional[datetime.datetime] = None) -> Optional[Dict[str, Any]]:
         """Updates virtual position tracking against live market ticks."""
         if symbol not in self.active_positions:
             return None
@@ -109,7 +109,7 @@ class PaperTradingEngine(BaseTradingEngine):
             print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] 🛡️ [PAPER TRAIL] {symbol} reached +1R profit! SL moved to Breakeven (₹{entry_p:.2f}).")
 
         # 4. Mandatory Squareoff
-        if self.is_squareoff_time():
+        if self.is_squareoff_time(now=now):
             return self._close_position(symbol, current_ltp, '3PM EXIT ⏱️')
 
         return None
@@ -282,27 +282,32 @@ class PaperTradingEngine(BaseTradingEngine):
                 continue
 
     def monitor_active_positions(self) -> None:
-        """Checks active positions against latest prices and handles SL / TP / Trailing."""
+        """
+        High-Frequency Position Guardian:
+        Checks active positions against latest 1m candle ticks and triggers instant SL, TP, or +1R Trailing SL.
+        """
         if not self.active_positions:
             return
 
         for symbol in list(self.active_positions.keys()):
             ticker = f"{symbol.replace('-EQ', '')}.NS"
             try:
-                raw_df = fetch_stock_candles(ticker, period="1d", interval=self.config.TIMEFRAME)
-                if raw_df is None or raw_df.empty:
+                tick = fetch_latest_tick_price(ticker)
+                if tick is None:
                     continue
-                latest_bar = raw_df.iloc[-1]
-                ltp = float(latest_bar['Close'])
-                high = float(latest_bar['High'])
-                low = float(latest_bar['Low'])
+                ltp = tick['ltp']
+                high = tick['high']
+                low = tick['low']
 
                 self.update_position(symbol=symbol, current_ltp=ltp, high=high, low=low)
             except Exception:
                 continue
 
     def squareoff_all_positions(self) -> None:
-        """Mandatory 3:00 PM square-off for all remaining open virtual positions."""
+        """
+        Mandatory 3:00 PM square-off for all remaining open virtual positions.
+        Resolves accurate exit price using high-frequency 1m/5m live tick feeds.
+        """
         if not self.active_positions:
             return
 
@@ -313,15 +318,17 @@ class PaperTradingEngine(BaseTradingEngine):
 
         for symbol in list(self.active_positions.keys()):
             ticker = f"{symbol.replace('-EQ', '')}.NS"
+            ltp = self.active_positions[symbol]['entry_price']
             try:
-                raw_df = fetch_stock_candles(ticker, period="1d", interval=self.config.TIMEFRAME)
-                ltp = float(raw_df.iloc[-1]['Close']) if raw_df is not None and not raw_df.empty else self.active_positions[symbol]['entry_price']
+                tick = fetch_latest_tick_price(ticker)
+                if tick is not None and tick.get('ltp'):
+                    ltp = tick['ltp']
             except Exception:
-                ltp = self.active_positions[symbol]['entry_price']
+                pass
 
             try:
                 self._close_position(symbol, exit_price=ltp, result='3PM EXIT ⏱️')
-            except Exception as e:
+            except Exception:
                 # Fallback: ensure DB record closes even if terminal print encoding fails
                 try:
                     self._close_position(symbol, exit_price=ltp, result='3PM EXIT')
@@ -331,12 +338,14 @@ class PaperTradingEngine(BaseTradingEngine):
     def run_live_loop(self) -> None:
         """
         Continuous live execution daemon.
-        Monitors 15-minute candle closes, scans universe, tracks trailing SL,
-        enforces 15:00 squareoff, and prints EOD report.
+        - Strategy Scans (Macro Loop): Runs strictly on 15m candle close boundaries (:00, :15, :30, :45).
+        - Position Guardian (Micro Loop): Polls active positions every 15s for instant SL/TP/Trailing.
+        - Enforces 15:00 squareoff and prints EOD report on market close.
         """
         print(f"\n=======================================================")
         print(f"       PAPER TRADING ENGINE: {STRATEGY_NAME}")
         print(f"       Capital: ₹{self.config.INITIAL_CAPITAL:,.0f} | Max Slots: {self.config.MAX_CONCURRENT_POSITIONS}")
+        print(f"       Scanning: 15m Candle Closes | Guardian: {self.config.POSITION_MONITOR_INTERVAL_SEC}s Ticks")
         print(f"=======================================================\n")
 
         # 1. Authenticate & restore SQLite state
@@ -371,20 +380,35 @@ class PaperTradingEngine(BaseTradingEngine):
                     print(f"[{now.strftime('%H:%M:%S')}] 🏁 Trading session completed for today.")
                     break
 
-                # 3. Monitor existing positions
-                self.monitor_active_positions()
-
-                # 4. Check if Entry Window is active (10:00 AM - 1:30 PM)
+                # 3. Strategy Entry Window Scan (10:00 AM - 1:30 PM on 15m Candle Closes)
                 if self.is_entry_window_active(now):
                     if len(self.active_positions) < self.config.MAX_CONCURRENT_POSITIONS:
                         nifty_pct_map = fetch_nifty_benchmark(period="5d", interval=self.config.TIMEFRAME)
                         self.scan_and_execute_signals(nifty_pct_map)
 
-                # 5. Sleep until next 15m candle close boundary
+                # 4. Non-Blocking High-Frequency Guardian Loop:
+                # Interleaves 15-second active position checks while waiting for next 15m candle close
                 wait_sec = self.get_seconds_until_next_candle(interval_mins=15, now=now)
                 next_check = (now + datetime.timedelta(seconds=wait_sec)).strftime('%H:%M:%S')
-                print(f"[{now.strftime('%H:%M:%S')}] 💤 Sleeping {wait_sec}s until next candle close ({next_check}). Active slots: {len(self.active_positions)}/{self.config.MAX_CONCURRENT_POSITIONS}")
-                time.sleep(wait_sec)
+                print(f"[{now.strftime('%H:%M:%S')}] 💤 Next 15m scan in {wait_sec}s ({next_check}). Active slots: {len(self.active_positions)}/{self.config.MAX_CONCURRENT_POSITIONS}")
+
+                # Poll active positions every POSITION_MONITOR_INTERVAL_SEC seconds until next candle boundary
+                poll_interval = self.config.POSITION_MONITOR_INTERVAL_SEC
+                target_wake_time = time.time() + wait_sec
+                while time.time() < target_wake_time:
+                    remaining_time = target_wake_time - time.time()
+                    sleep_chunk = min(poll_interval, remaining_time)
+                    if sleep_chunk > 0:
+                        time.sleep(sleep_chunk)
+
+                    # High-frequency guardian check for active positions
+                    if self.active_positions:
+                        self.monitor_active_positions()
+
+                    # Re-check 3:00 PM squareoff during polling
+                    curr_time = datetime.datetime.now()
+                    if self.is_squareoff_time(curr_time):
+                        break
 
         except KeyboardInterrupt:
             print("\n⚠️ User interrupted live loop (Ctrl+C). Generating current session report...")
