@@ -217,6 +217,51 @@ class TestTradeDatabase(unittest.TestCase):
                     cursor.execute("DELETE FROM active_positions WHERE symbol IN (?, ?)", (stale_probe_symbol, today_probe_symbol))
                     conn.commit()
 
+    def test_reconcile_stale_positions(self):
+        """Verifies that past-session orphaned trades are automatically resolved, calculated, and archived to trade_history."""
+        from core.trade_db import get_db_connection, reconcile_stale_positions, get_active_positions, get_trade_journal
+        
+        test_mode = "paper"
+        init_db(mode=test_mode)
+        orphan_probe = "ORPHAN_RECON_PROBE-EQ"
+        yesterday_str = (datetime.datetime.now() - datetime.timedelta(days=2)).strftime("%Y-%m-%d 10:30:00")
+
+        # 1. Clean and insert an orphaned trade into active_positions
+        with get_db_connection(mode=test_mode) as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM active_positions WHERE symbol = ?", (orphan_probe,))
+            cursor.execute("DELETE FROM trade_history WHERE symbol = ?", (orphan_probe,))
+            cursor.execute("""
+                INSERT INTO active_positions (
+                    symbol, entry_order_id, sl_order_id, quantity,
+                    entry_price, initial_sl, current_sl, target_price,
+                    status, entry_time
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE', ?)
+            """, (orphan_probe, "ORPH_ORD_1", "ORPH_SL_1", 10, 1500.0, 1520.0, 1520.0, 1460.0, yesterday_str))
+            conn.commit()
+
+        # 2. Run automated reconciliation
+        reconciled = reconcile_stale_positions(mode=test_mode)
+        reconciled_syms = [r['symbol'] for r in reconciled]
+        self.assertIn(orphan_probe, reconciled_syms)
+
+        # 3. Verify it was removed from active_positions
+        active_syms = [p['symbol'] for p in get_active_positions(mode=test_mode)]
+        self.assertNotIn(orphan_probe, active_syms)
+
+        # 4. Verify it was archived in trade_history
+        history = get_trade_journal(mode=test_mode, limit=10)
+        archived = next((h for h in history if h['symbol'] == orphan_probe), None)
+        self.assertIsNotNone(archived)
+        self.assertIsNotNone(archived['net_pnl'])
+        self.assertGreater(archived['taxes_fees'], 0)
+
+        # 5. Clean up probe
+        with get_db_connection(mode=test_mode) as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM trade_history WHERE symbol = ?", (orphan_probe,))
+            conn.commit()
+
 
 if __name__ == "__main__":
     unittest.main()

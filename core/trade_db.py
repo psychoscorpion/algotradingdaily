@@ -303,6 +303,122 @@ def get_stale_positions(mode: Optional[str] = None) -> List[Dict[str, Any]]:
     return stale_list
 
 
+def reconcile_stale_positions(mode: str = "paper") -> List[Dict[str, Any]]:
+    """
+    Automated pre-market self-healing reconciler (Issue #15):
+    Inspects active_positions for past-session orphaned trades, replays their candle
+    history via simulate_single_trade() to discover the exact historical exit
+    (TARGET_HIT, SL_HIT, TRAILING_SL_HIT, or ALGO_SQUAREOFF_DAY_END), calculates
+    statutory charges/PnL, and atomically archives them to trade_history.
+    """
+    from core.charges import calculate_charges
+    from data_pipeline.data_feed import load_candle_data
+    from strategies.vwap_stoch_breakdown import simulate_single_trade
+
+    stale_trades = get_stale_positions(mode=mode)
+    if not stale_trades:
+        return []
+
+    reconciled_records = []
+    init_db(mode)
+
+    for trade in stale_trades:
+        symbol = trade['symbol']
+        ticker_yf = symbol.replace('-EQ', '') + '.NS' if not symbol.endswith('.NS') else symbol
+        entry_time_str = trade['entry_time']
+        entry_price = float(trade['entry_price'])
+        quantity = int(trade['quantity'])
+        order_type = trade.get('order_type', 'BO')
+
+        # 1. Attempt historical candle replay
+        resolved_exit_price = entry_price
+        resolved_exit_time = entry_time_str
+        resolved_result = TradeExitReason.ALGO_SQUAREOFF_DAY_END
+
+        try:
+            raw_df = load_candle_data(ticker_yf, period="60d", interval=CONFIG.TIMEFRAME, force_refresh=False, verbose=False)
+            if raw_df is not None and not raw_df.empty:
+                # Find entry row
+                entry_dt = None
+                try:
+                    entry_dt = datetime.datetime.strptime(entry_time_str, "%Y-%m-%d %H:%M:%S")
+                except Exception:
+                    try:
+                        entry_dt = datetime.datetime.fromisoformat(entry_time_str)
+                    except Exception:
+                        pass
+
+                if entry_dt:
+                    entry_date = entry_dt.date()
+                    day_candles = raw_df[raw_df.index.date == entry_date]
+                    if not day_candles.empty:
+                        # Locate entry candle index within full raw_df
+                        matching_indices = [i for i, dt in enumerate(raw_df.index) if dt.date() == entry_date and dt <= entry_dt]
+                        entry_idx = matching_indices[-1] if matching_indices else None
+                        
+                        if entry_idx is not None:
+                            sim_result = simulate_single_trade(raw_df, entry_idx, ticker_yf, config=CONFIG)
+                            if sim_result:
+                                resolved_exit_price = round(float(sim_result['Exit Price']), 2)
+                                resolved_exit_time = sim_result['Exit Time'].strftime("%Y-%m-%d %H:%M:%S")
+                                resolved_result = sim_result['Result']
+                            else:
+                                # Default to 3:00 PM candle close of that day
+                                sq_candles = day_candles[(day_candles.index.hour == CONFIG.SQUAREOFF_HOUR) & (day_candles.index.minute >= CONFIG.SQUAREOFF_MINUTE)]
+                                if not sq_candles.empty:
+                                    resolved_exit_price = round(float(sq_candles.iloc[0]['Close']), 2)
+                                    resolved_exit_time = sq_candles.index[0].strftime("%Y-%m-%d %H:%M:%S")
+                                else:
+                                    resolved_exit_price = round(float(day_candles.iloc[-1]['Close']), 2)
+                                    resolved_exit_time = day_candles.index[-1].strftime("%Y-%m-%d %H:%M:%S")
+        except Exception:
+            # Fallback to trade SL or entry price if data replay fails
+            resolved_exit_price = round(float(trade.get('current_sl', entry_price)), 2)
+
+        # 2. Compute financial charges & PnL
+        # Short trade: Entry is SELL, Exit is BUY
+        entry_turnover = entry_price * quantity
+        exit_turnover = resolved_exit_price * quantity
+        gross_pnl = round(entry_turnover - exit_turnover, 2)
+        taxes_fees = round(calculate_charges(
+            sell_turnover=entry_turnover,
+            buy_turnover=exit_turnover,
+            broker=getattr(CONFIG, 'ACTIVE_BROKER', 'shoonya')
+        ), 2)
+        net_pnl = round(gross_pnl - taxes_fees, 2)
+
+        # 3. Atomically archive to trade_history and clear from active_positions
+        created_at_now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with get_db_connection(mode=mode) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO trade_history (
+                    symbol, order_type, entry_time, exit_time, 
+                    entry_price, exit_price, quantity, result, 
+                    gross_pnl, taxes_fees, net_pnl, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                symbol, order_type, entry_time_str, resolved_exit_time,
+                entry_price, resolved_exit_price, quantity, resolved_result,
+                gross_pnl, taxes_fees, net_pnl, created_at_now
+            ))
+            cursor.execute("DELETE FROM active_positions WHERE symbol = ?", (symbol,))
+            conn.commit()
+
+        reconciled_records.append({
+            'symbol': symbol,
+            'entry_time': entry_time_str,
+            'exit_time': resolved_exit_time,
+            'entry_price': entry_price,
+            'exit_price': resolved_exit_price,
+            'quantity': quantity,
+            'result': resolved_result,
+            'net_pnl': net_pnl
+        })
+
+    return reconciled_records
+
+
 if __name__ == "__main__":
     if hasattr(sys.stdout, 'reconfigure'):
         sys.stdout.reconfigure(encoding='utf-8')

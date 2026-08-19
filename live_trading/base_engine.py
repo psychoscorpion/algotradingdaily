@@ -153,28 +153,25 @@ class BaseTradingEngine(NorenApi):
         return [f"{s.replace('.NS', '')}-EQ" for s in symbols]
 
     def sync_active_positions_from_db(self, mode: Optional[str] = None) -> int:
-        """Restores open trade state from SQLite database on engine startup/recovery and logs sanity diagnostics."""
-        from core.trade_db import get_active_positions, get_stale_positions, get_db_path
+        """Restores open trade state from SQLite database on engine startup/recovery and resolves past-session stale trades."""
+        from core.trade_db import get_active_positions, get_stale_positions, reconcile_stale_positions, get_db_path
         
         target_mode = (mode or self.config.TRADING_MODE).lower()
         db_path = get_db_path(target_mode)
         
-        # 1. Startup Sanity Diagnostics: Detect unclosed trades from previous calendar sessions
+        # 1. Startup Sanity Diagnostics & Automated Reconciler (Issue #15)
         stale_positions = get_stale_positions(mode=target_mode)
         if stale_positions:
-            print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] ⚠️ WARNING: Detected {len(stale_positions)} stale/orphan position(s) from past session(s) in {db_path}:")
-            for sp in stale_positions:
-                sym = sp.get('symbol', 'UNKNOWN')
-                ent = sp.get('entry_time', '')
-                qty = sp.get('quantity', 0)
-                ep = sp.get('entry_price', 0.0)
-                age = sp.get('age_str', 'N/A')
-                print(f"    • {sym:<12} | Entry: {ent} | Qty: {qty:>3} | Entry Price: ₹{ep:>8,.2f} | Age: {age}")
-            print(f"    ℹ️  Note: Stale positions are retained for audit and will be resolved in pre-market reconciliation.")
+            print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] ⚠️ Detected {len(stale_positions)} stale position(s) from past session(s). Starting automated reconciliation...")
+            reconciled = reconcile_stale_positions(mode=target_mode)
+            for r in reconciled:
+                print(f"    ✅ Reconciled: {r['symbol']} | Exited @ ₹{r['exit_price']} ({r['exit_time']}) | Result: {r['result']} | Net PnL: ₹{r['net_pnl']:+,.2f}")
+            print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] 🛡️ Pre-market reconciliation complete: All stale positions archived.")
         else:
             print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] ✅ Database Sanity Check: 0 stale positions detected in {db_path}.")
 
         # 2. Restore active positions into in-memory state
+        self.active_positions.clear()
         saved = get_active_positions(mode=target_mode)
         for pos in saved:
             self.active_positions[pos['symbol']] = pos
