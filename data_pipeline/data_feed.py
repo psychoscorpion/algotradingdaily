@@ -180,6 +180,29 @@ def fetch_stock_candles(
     )
 
 
+def fetch_verified_candles(
+    ticker: str,
+    period: str = "5d",
+    interval: str = "15m",
+    retry_delays: tuple = (0, 3, 5, 7),
+) -> Optional[pd.DataFrame]:
+    """
+    Ingests live candle data with resilient multi-attempt retry (0s, 3s, 5s, 7s)
+    to handle public CDN propagation lag at exact candle boundaries.
+    """
+    import time
+    for delay in retry_delays:
+        if delay > 0:
+            time.sleep(delay)
+        try:
+            df = fetch_stock_candles(ticker, period=period, interval=interval, force_refresh=True)
+            if df is not None and not df.empty and len(df) >= 30:
+                return df
+        except Exception:
+            continue
+    return None
+
+
 def fetch_latest_tick_price(ticker: str) -> Optional[Dict[str, float]]:
     """
     Fetches latest live candle tick (Close, High, Low) for an active position.

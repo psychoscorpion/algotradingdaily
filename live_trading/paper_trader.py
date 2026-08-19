@@ -27,7 +27,13 @@ if hasattr(sys.stdout, 'reconfigure'):
 from config import CONFIG, TradingConfig
 from live_trading.base_engine import BaseTradingEngine
 from strategies.vwap_stoch_breakdown import STRATEGY_NAME, evaluate_signals
-from data_pipeline import get_nifty50_symbols, fetch_nifty_benchmark, fetch_stock_candles, fetch_latest_tick_price
+from data_pipeline import (
+    get_nifty50_symbols,
+    fetch_nifty_benchmark,
+    fetch_stock_candles,
+    fetch_verified_candles,
+    fetch_latest_tick_price,
+)
 from core.trade_db import (
     save_active_position,
     update_trailing_sl,
@@ -261,7 +267,7 @@ class PaperTradingEngine(BaseTradingEngine):
                 continue
 
             try:
-                raw_df = fetch_stock_candles(ticker, period="5d", interval=self.config.TIMEFRAME)
+                raw_df = fetch_verified_candles(ticker, period="5d", interval=self.config.TIMEFRAME)
                 if raw_df is None or len(raw_df) < (self.config.SWING_HIGH_BARS + 5):
                     continue
 
