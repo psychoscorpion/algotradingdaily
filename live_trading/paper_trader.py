@@ -390,7 +390,7 @@ class PaperTradingEngine(BaseTradingEngine):
                 # 3. Strategy Entry Window Scan (10:00 AM - 1:30 PM on 15m Candle Closes)
                 if self.is_entry_window_active(now):
                     if len(self.active_positions) < self.config.MAX_CONCURRENT_POSITIONS:
-                        nifty_pct_map = fetch_nifty_benchmark(period="5d", interval=self.config.TIMEFRAME)
+                        nifty_pct_map = self.get_benchmark_feed()
                         self.scan_and_execute_signals(nifty_pct_map)
 
                 # 4. Non-Blocking High-Frequency Guardian Loop:
@@ -402,8 +402,19 @@ class PaperTradingEngine(BaseTradingEngine):
                 # Poll active positions every POSITION_MONITOR_INTERVAL_SEC seconds until next candle boundary
                 poll_interval = self.config.POSITION_MONITOR_INTERVAL_SEC
                 target_wake_time = time.time() + wait_sec
+                prewarmed = False
+
                 while time.time() < target_wake_time:
                     remaining_time = target_wake_time - time.time()
+
+                    # Pre-warm benchmark feed ~5s before next candle close for zero-latency scanning
+                    if remaining_time <= 5.0 and not prewarmed and self.is_entry_window_active(datetime.datetime.now()):
+                        try:
+                            self.prewarm_benchmark_feed()
+                            prewarmed = True
+                        except Exception:
+                            pass
+
                     sleep_chunk = min(poll_interval, remaining_time)
                     if sleep_chunk > 0:
                         time.sleep(sleep_chunk)

@@ -43,12 +43,37 @@ class BaseTradingEngine(NorenApi):
         )
         self.config = config
         self.active_positions: Dict[str, Dict[str, Any]] = {}
+        self.cached_nifty_benchmark: Optional[Any] = None
         self.user = os.getenv("SHOONYA_USER")
         self.pwd = os.getenv("SHOONYA_PWD")
         self.api_key = os.getenv("SHOONYA_API_KEY")
         self.vendor_code = os.getenv("SHOONYA_VENDOR_CODE")
         self.totp_key = os.getenv("SHOONYA_TOTP_KEY")
         self.imei = os.getenv("SHOONYA_IMEI", "shoonya_algo_desktop")
+
+    def prewarm_benchmark_feed(self) -> bool:
+        """
+        Pre-fetches NIFTY 50 benchmark index ~5s before candle boundary into in-memory RAM
+        to eliminate network latency on candle close.
+        """
+        from data_pipeline import fetch_nifty_benchmark
+        try:
+            feed = fetch_nifty_benchmark(period="5d", interval=self.config.TIMEFRAME)
+            if feed is not None and not feed.empty:
+                self.cached_nifty_benchmark = feed
+                return True
+            return False
+        except Exception:
+            return False
+
+    def get_benchmark_feed(self) -> Any:
+        """Returns pre-warmed benchmark feed or performs on-demand fallback fetch."""
+        from data_pipeline import fetch_nifty_benchmark
+        if self.cached_nifty_benchmark is not None and not self.cached_nifty_benchmark.empty:
+            feed = self.cached_nifty_benchmark
+            self.cached_nifty_benchmark = None  # Consume cache
+            return feed
+        return fetch_nifty_benchmark(period="5d", interval=self.config.TIMEFRAME)
 
     def authenticate(self) -> bool:
         """Performs automated TOTP authentication with Shoonya or falls back to virtual mode."""
