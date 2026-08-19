@@ -28,7 +28,14 @@ from config import CONFIG, TradingConfig
 from live_trading.base_engine import BaseTradingEngine
 from strategies.vwap_stoch_breakdown import STRATEGY_NAME, evaluate_signals
 from data_pipeline import get_nifty50_symbols, fetch_nifty_benchmark, fetch_stock_candles, fetch_latest_tick_price
-from core.trade_db import save_active_position, update_trailing_sl, close_and_archive_position, get_active_positions
+from core.trade_db import (
+    save_active_position,
+    update_trailing_sl,
+    close_and_archive_position,
+    get_active_positions,
+    TradeExitReason,
+    EXIT_DISPLAY_LABELS,
+)
 from alerts import notify_trade_entry, notify_trailing_sl, notify_trade_exit, notify_eod_summary
 
 
@@ -91,13 +98,13 @@ class PaperTradingEngine(BaseTradingEngine):
 
         # 1. Stop Loss Trigger
         if high >= curr_sl:
-            result = 'TRAIL SL (BE) 🛡️' if pos['trailed'] else 'SL HIT ❌'
+            result = TradeExitReason.TRAILING_SL_HIT if pos['trailed'] else TradeExitReason.SL_HIT
             exit_price = curr_sl
             return self._close_position(symbol, exit_price, result)
 
         # 2. Target Trigger
         if low <= tp:
-            result = 'TARGET HIT ✅'
+            result = TradeExitReason.TARGET_HIT
             exit_price = tp
             return self._close_position(symbol, exit_price, result)
 
@@ -111,14 +118,14 @@ class PaperTradingEngine(BaseTradingEngine):
 
         # 4. Mandatory Squareoff
         if self.is_squareoff_time(now=now):
-            return self._close_position(symbol, current_ltp, '3PM EXIT ⏱️')
+            return self._close_position(symbol, current_ltp, TradeExitReason.ALGO_SQUAREOFF_DAYEND)
 
         return None
 
     def _close_position(self, symbol: str, exit_price: float, result: str, exit_time: Optional[str] = None) -> Dict[str, Any]:
         """Closes virtual position, computes fees, logs result, and archives to SQLite database."""
         from core.charges import calculate_charges
-        from core.trade_db import close_and_archive_position
+        from core.trade_db import close_and_archive_position, EXIT_DISPLAY_LABELS
 
         pos = self.active_positions.pop(symbol)
         entry_p = pos['entry_price']
@@ -132,7 +139,7 @@ class PaperTradingEngine(BaseTradingEngine):
         pnl_pct = (pos['entry_price'] - exit_price) / pos['entry_price'] * 100
         actual_exit_time = exit_time or datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-        # Archive atomically to database/paper_trades.db
+        # Archive atomically to database/paper_trades.db with clean enum
         close_and_archive_position(
             symbol=symbol,
             exit_price=exit_price,
@@ -144,6 +151,7 @@ class PaperTradingEngine(BaseTradingEngine):
             mode="paper"
         )
 
+        display_result = EXIT_DISPLAY_LABELS.get(result, result)
         trade_record = {
             'symbol': symbol,
             'entry_time': pos['entry_time'],
@@ -158,8 +166,8 @@ class PaperTradingEngine(BaseTradingEngine):
             'result': result
         }
         self.paper_trades.append(trade_record)
-        print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] 🏁 [PAPER EXIT] {symbol} @ ₹{exit_price:.2f} | Net PnL: ₹{net_pnl:+.2f} ({pnl_pct:+.2f}%) | {result}")
-        notify_trade_exit(symbol=symbol, price=exit_price, net_pnl=net_pnl, pnl_pct=pnl_pct, reason=result, mode="paper", config=self.config)
+        print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] 🏁 [PAPER EXIT] {symbol} @ ₹{exit_price:.2f} | Net PnL: ₹{net_pnl:+.2f} ({pnl_pct:+.2f}%) | {display_result}")
+        notify_trade_exit(symbol=symbol, price=exit_price, net_pnl=net_pnl, pnl_pct=pnl_pct, reason=display_result, mode="paper", config=self.config)
         return trade_record
 
     def generate_eod_report(self) -> None:
@@ -208,11 +216,13 @@ class PaperTradingEngine(BaseTradingEngine):
         print("=====================================================")
         print("Trade Log:")
         trade_lines = []
+        from core.trade_db import EXIT_DISPLAY_LABELS
         for idx, t in enumerate(day_trades, 1):
             sym = t.get('symbol', 'UNKNOWN')
             ep = t.get('entry_price', 0.0)
             xp = t.get('exit_price', 0.0)
-            res = t.get('result', '')
+            raw_res = t.get('result', '')
+            res = EXIT_DISPLAY_LABELS.get(raw_res, raw_res)
             npnl = t.get('net_pnl', 0.0)
             line = f"{idx}. {sym:<14}: SHORT @ ₹{ep:,.2f} -> {res} @ ₹{xp:,.2f} | Net: {'+' if npnl >= 0 else '-'}₹{abs(npnl):,.2f}"
             trade_lines.append(line)
@@ -328,13 +338,9 @@ class PaperTradingEngine(BaseTradingEngine):
                 pass
 
             try:
-                self._close_position(symbol, exit_price=ltp, result='3PM EXIT ⏱️')
+                self._close_position(symbol, exit_price=ltp, result=TradeExitReason.ALGO_SQUAREOFF_DAYEND)
             except Exception:
-                # Fallback: ensure DB record closes even if terminal print encoding fails
-                try:
-                    self._close_position(symbol, exit_price=ltp, result='3PM EXIT')
-                except Exception:
-                    pass
+                pass
 
     def run_live_loop(self) -> None:
         """

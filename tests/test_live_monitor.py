@@ -24,6 +24,7 @@ class TestLivePositionGuardian(unittest.TestCase):
 
     def test_instant_stop_loss_trigger(self):
         """Verifies that high-frequency tick above Stop-Loss triggers instant SL exit."""
+        from core.trade_db import TradeExitReason
         self.engine.active_positions["NESTLEIND-EQ"] = {
             'symbol': 'NESTLEIND-EQ',
             'entry_price': 1471.10,
@@ -40,12 +41,13 @@ class TestLivePositionGuardian(unittest.TestCase):
         # Simulated tick spikes to 1477.00 (above SL of 1476.14)
         trade = self.engine.update_position(symbol="NESTLEIND-EQ", current_ltp=1476.50, high=1477.00, low=1475.00)
         self.assertIsNotNone(trade)
-        self.assertEqual(trade['result'], 'SL HIT ❌')
+        self.assertEqual(trade['result'], TradeExitReason.SL_HIT)
         self.assertEqual(trade['exit_price'], 1476.14)
         self.assertNotIn("NESTLEIND-EQ", self.engine.active_positions)
 
     def test_instant_target_trigger(self):
         """Verifies that high-frequency tick at or below Target (1:2 R:R) triggers instant TP exit."""
+        from core.trade_db import TradeExitReason
         self.engine.active_positions["HINDUNILVR-EQ"] = {
             'symbol': 'HINDUNILVR-EQ',
             'entry_price': 2039.90,
@@ -62,7 +64,7 @@ class TestLivePositionGuardian(unittest.TestCase):
         # Simulated tick dips to 2025.00 (below TP of 2027.66)
         trade = self.engine.update_position(symbol="HINDUNILVR-EQ", current_ltp=2026.00, high=2035.00, low=2025.00)
         self.assertIsNotNone(trade)
-        self.assertEqual(trade['result'], 'TARGET HIT ✅')
+        self.assertEqual(trade['result'], TradeExitReason.TARGET_HIT)
         self.assertEqual(trade['exit_price'], 2027.66)
         self.assertNotIn("HINDUNILVR-EQ", self.engine.active_positions)
 
@@ -91,6 +93,7 @@ class TestLivePositionGuardian(unittest.TestCase):
     @patch("live_trading.paper_trader.fetch_latest_tick_price")
     def test_precise_3pm_squareoff_price_resolution(self, mock_tick):
         """Verifies that 3:00 PM square-off uses live market tick price rather than falling back to entry price."""
+        from core.trade_db import TradeExitReason
         mock_tick.return_value = {'ltp': 1465.50, 'high': 1466.00, 'low': 1464.00}
 
         self.engine.active_positions["NESTLEIND-EQ"] = {
@@ -102,16 +105,19 @@ class TestLivePositionGuardian(unittest.TestCase):
             'tp_price': 1461.02,
             'risk': 5.04,
             'trailed': False,
-            'order_id': 'ORD_1',
-            'sl_order_id': 'SL_1'
+            'order_id': 'ORD_4',
+            'sl_order_id': 'SL_4'
         }
 
+        # Trigger mandatory 3PM squareoff
         self.engine.squareoff_all_positions()
+
+        # Position should be closed and archived at the mock tick price of 1465.50
         self.assertNotIn("NESTLEIND-EQ", self.engine.active_positions)
         self.assertEqual(len(self.engine.paper_trades), 1)
         closed_trade = self.engine.paper_trades[0]
-        self.assertEqual(closed_trade['exit_price'], 1465.50)  # Used true live LTP
-        self.assertEqual(closed_trade['result'], '3PM EXIT ⏱️')
+        self.assertEqual(closed_trade['exit_price'], 1465.50)
+        self.assertEqual(closed_trade['result'], TradeExitReason.ALGO_SQUAREOFF_DAYEND)
         self.assertGreater(closed_trade['net_pnl'], 0)  # Profitable short exit!
 
 

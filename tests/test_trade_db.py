@@ -30,6 +30,7 @@ from core.trade_db import (
     close_and_archive_position,
     get_active_positions,
     get_trade_journal,
+    TradeExitReason,
 )
 
 
@@ -80,7 +81,7 @@ class TestTradeDatabase(unittest.TestCase):
                     symbol=test_probe_symbol,
                     exit_price=1480.0,
                     exit_time=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    result="TARGET HIT ✅",
+                    result=TradeExitReason.TARGET_HIT,
                     gross_pnl=200.0,
                     taxes_fees=15.5,
                     net_pnl=184.5,

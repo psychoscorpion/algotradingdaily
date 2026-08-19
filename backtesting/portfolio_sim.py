@@ -225,9 +225,11 @@ def print_simulation_report(
     print(f"Avg Win / Avg Loss     : +₹{avg_win:,.2f} / -₹{avg_loss:,.2f}")
     print("=======================================================\n")
     print("Outcome Distribution:")
+    from core.trade_db import EXIT_DISPLAY_LABELS
     for result_name, count in tdf['Result'].value_counts().items():
         pct = (count / total_trades) * 100
-        print(f"  • {result_name:<20} : {count:>3} trades ({pct:>5.1f}%)")
+        display_label = EXIT_DISPLAY_LABELS.get(result_name, str(result_name))
+        print(f"  • {display_label:<22} : {count:>3} trades ({pct:>5.1f}%)")
 
     # Multi-Broker Friction & Net Return Comparison Matrix
     from core.charges import BROKER_CHARGES_CONFIG

@@ -33,6 +33,28 @@ BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 DB_DIR = os.path.join(BASE_DIR, "database")
 
 
+class TradeExitReason:
+    """Standardized uppercase database enum identifiers for trade closure outcomes."""
+    TARGET_HIT = "TARGET_HIT"                            # 1:2 R:R target achieved
+    SL_HIT = "SL_HIT"                                    # Initial Stop Loss triggered
+    TRAILING_SL_HIT = "TRAILING_SL_HIT"                  # Trailed SL (Breakeven) triggered
+    ALGO_SQUAREOFF_DAYEND = "ALGO_SQUAREOFF_DAYEND"      # 3:00 PM session square-off
+    DAILY_LOSS_THRESHOLD_HIT = "DAILY_LOSS_THRESHOLD_HIT"# Daily max portfolio loss reached
+    MANUAL_SQUAREOFF = "MANUAL_SQUAREOFF"                # User manual emergency square-off
+    BROKER_RMS_SQUAREOFF = "BROKER_RMS_SQUAREOFF"        # Broker RMS forced exit
+
+
+EXIT_DISPLAY_LABELS = {
+    TradeExitReason.TARGET_HIT: "TARGET HIT ✅",
+    TradeExitReason.SL_HIT: "SL HIT ❌",
+    TradeExitReason.TRAILING_SL_HIT: "TRAIL SL (BE) 🛡️",
+    TradeExitReason.ALGO_SQUAREOFF_DAYEND: "3PM EXIT ⏱️",
+    TradeExitReason.DAILY_LOSS_THRESHOLD_HIT: "DAILY MAX LOSS EXIT 🚨",
+    TradeExitReason.MANUAL_SQUAREOFF: "MANUAL EXIT 🛑",
+    TradeExitReason.BROKER_RMS_SQUAREOFF: "BROKER RMS EXIT ⚠️",
+}
+
+
 def get_db_path(mode: Optional[str] = None) -> str:
     """Returns absolute path to the SQLite database file for the given mode (defaults to CONFIG.TRADING_MODE)."""
     selected_mode = (mode or CONFIG.TRADING_MODE).lower()

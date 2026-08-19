@@ -21,6 +21,7 @@ import pandas as pd
 from typing import Optional, Dict, Any
 from config import CONFIG, TradingConfig
 from core.indicators import add_stoch_rsi, add_adx, add_vwap, add_relative_weakness
+from core.trade_db import TradeExitReason
 
 STRATEGY_NAME = "VWAP-Stoch Breakdown"
 STRATEGY_VERSION = "1.0.0"
@@ -118,14 +119,14 @@ def simulate_single_trade(
         # 1. Check if current SL is hit
         if h_val >= curr_sl:
             if trailed:
-                exit_t, pnl_pct, result = t_bar, 0.0, 'TRAIL SL (BE) 🛡️'
+                exit_t, pnl_pct, result = t_bar, 0.0, TradeExitReason.TRAILING_SL_HIT
             else:
-                exit_t, pnl_pct, result = t_bar, -risk_pct, 'SL HIT ❌'
+                exit_t, pnl_pct, result = t_bar, -risk_pct, TradeExitReason.SL_HIT
             break
 
         # 2. Check if Target is hit
         elif l_val <= tp:
-            exit_t, pnl_pct, result = t_bar, (config.RISK_REWARD_RATIO * risk_pct), 'TARGET HIT ✅'
+            exit_t, pnl_pct, result = t_bar, (config.RISK_REWARD_RATIO * risk_pct), TradeExitReason.TARGET_HIT
             break
 
         # 3. Check if +1R profit threshold is reached to trail SL to Breakeven
@@ -135,7 +136,7 @@ def simulate_single_trade(
 
         # 4. Check Configurable Square-Off (Default: 3:00 PM)
         if (t_bar.hour == config.SQUAREOFF_HOUR and t_bar.minute >= config.SQUAREOFF_MINUTE) or (t_bar.hour > config.SQUAREOFF_HOUR):
-            exit_t, pnl_pct, result = t_bar, (entry_p - c_val) / entry_p, '3PM EXIT ⏱️'
+            exit_t, pnl_pct, result = t_bar, (entry_p - c_val) / entry_p, TradeExitReason.ALGO_SQUAREOFF_DAYEND
             break
 
     if exit_t:
