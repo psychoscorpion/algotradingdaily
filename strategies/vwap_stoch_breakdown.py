@@ -136,7 +136,7 @@ def simulate_single_trade(
 
         # 4. Check Configurable Square-Off (Default: 3:00 PM)
         if (t_bar.hour == config.SQUAREOFF_HOUR and t_bar.minute >= config.SQUAREOFF_MINUTE) or (t_bar.hour > config.SQUAREOFF_HOUR):
-            exit_t, pnl_pct, result = t_bar, (entry_p - c_val) / entry_p, TradeExitReason.ALGO_SQUAREOFF_DAYEND
+            exit_t, pnl_pct, result = t_bar, (entry_p - c_val) / entry_p, TradeExitReason.ALGO_SQUAREOFF_DAY_END
             break
 
     if exit_t:

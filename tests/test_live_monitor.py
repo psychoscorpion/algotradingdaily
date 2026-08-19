@@ -117,7 +117,7 @@ class TestLivePositionGuardian(unittest.TestCase):
         self.assertEqual(len(self.engine.paper_trades), 1)
         closed_trade = self.engine.paper_trades[0]
         self.assertEqual(closed_trade['exit_price'], 1465.50)
-        self.assertEqual(closed_trade['result'], TradeExitReason.ALGO_SQUAREOFF_DAYEND)
+        self.assertEqual(closed_trade['result'], TradeExitReason.ALGO_SQUAREOFF_DAY_END)
         self.assertGreater(closed_trade['net_pnl'], 0)  # Profitable short exit!
 
 

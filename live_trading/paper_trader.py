@@ -118,7 +118,7 @@ class PaperTradingEngine(BaseTradingEngine):
 
         # 4. Mandatory Squareoff
         if self.is_squareoff_time(now=now):
-            return self._close_position(symbol, current_ltp, TradeExitReason.ALGO_SQUAREOFF_DAYEND)
+            return self._close_position(symbol, current_ltp, TradeExitReason.ALGO_SQUAREOFF_DAY_END)
 
         return None
 
@@ -338,7 +338,7 @@ class PaperTradingEngine(BaseTradingEngine):
                 pass
 
             try:
-                self._close_position(symbol, exit_price=ltp, result=TradeExitReason.ALGO_SQUAREOFF_DAYEND)
+                self._close_position(symbol, exit_price=ltp, result=TradeExitReason.ALGO_SQUAREOFF_DAY_END)
             except Exception:
                 pass
 

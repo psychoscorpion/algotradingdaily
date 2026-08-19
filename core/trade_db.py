@@ -38,7 +38,7 @@ class TradeExitReason:
     TARGET_HIT = "TARGET_HIT"                            # 1:2 R:R target achieved
     SL_HIT = "SL_HIT"                                    # Initial Stop Loss triggered
     TRAILING_SL_HIT = "TRAILING_SL_HIT"                  # Trailed SL (Breakeven) triggered
-    ALGO_SQUAREOFF_DAYEND = "ALGO_SQUAREOFF_DAYEND"      # 3:00 PM session square-off
+    ALGO_SQUAREOFF_DAY_END = "ALGO_SQUAREOFF_DAY_END"    # 3:00 PM session square-off
     DAILY_LOSS_THRESHOLD_HIT = "DAILY_LOSS_THRESHOLD_HIT"# Daily max portfolio loss reached
     MANUAL_SQUAREOFF = "MANUAL_SQUAREOFF"                # User manual emergency square-off
     BROKER_RMS_SQUAREOFF = "BROKER_RMS_SQUAREOFF"        # Broker RMS forced exit
@@ -48,7 +48,7 @@ EXIT_DISPLAY_LABELS = {
     TradeExitReason.TARGET_HIT: "TARGET HIT ✅",
     TradeExitReason.SL_HIT: "SL HIT ❌",
     TradeExitReason.TRAILING_SL_HIT: "TRAIL SL (BE) 🛡️",
-    TradeExitReason.ALGO_SQUAREOFF_DAYEND: "3PM EXIT ⏱️",
+    TradeExitReason.ALGO_SQUAREOFF_DAY_END: "3PM EXIT ⏱️",
     TradeExitReason.DAILY_LOSS_THRESHOLD_HIT: "DAILY MAX LOSS EXIT 🚨",
     TradeExitReason.MANUAL_SQUAREOFF: "MANUAL EXIT 🛑",
     TradeExitReason.BROKER_RMS_SQUAREOFF: "BROKER RMS EXIT ⚠️",
